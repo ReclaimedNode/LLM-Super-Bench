@@ -202,7 +202,7 @@ function render() {
   // Setups.
   el.setups.textContent = "";
   const head = document.createElement("tr");
-  for (const h of ["MACHINE", "FROM", "MODEL FILE", "QUANT", "BUILD", "SLOTS", "REPLY LENGTH", "THINKING", "NOTES"]) {
+  for (const h of ["MACHINE", "FROM", "ENGINE", "MODEL FILE", "QUANT", "BUILD", "SLOTS", "REPLY LENGTH", "THINKING", "NOTES"]) {
     const th = document.createElement("th");
     th.textContent = h;
     head.append(th);
@@ -211,7 +211,7 @@ function render() {
   for (const s of series) {
     const st = s.machine?.setup ?? {};
     const tr = document.createElement("tr");
-    for (const v of [s.display, s.source, st.modelFile ?? s.machine?.model ?? "", st.quant ?? "", st.build ?? "", st.slots ?? "", s.file.settings.maxTokens ?? "", s.file.settings.thinking, st.notes ?? ""]) {
+    for (const v of [s.display, s.source, st.engine ?? "", st.modelFile ?? s.machine?.model ?? "", st.quant ?? "", st.build ?? "", st.slots ?? "", s.file.settings.maxTokens ?? "", s.file.settings.thinking, st.notes ?? ""]) {
       const td = document.createElement("td");
       td.textContent = String(v);
       tr.append(td);

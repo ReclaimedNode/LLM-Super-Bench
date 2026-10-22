@@ -208,6 +208,16 @@ export function buildScoreboard(results: LaneResult[]): Scoreboard {
         `${r.label} runs ${r.slots} at a time, so ${ran - r.slots} of the ${ran} streams waited in its queue. Its first word and total include that wait, so they are not like for like.`,
       );
     }
+    if (!r.blocked && !r.error && (r.cachedTokens ?? 0) > 0) {
+      notes.push(
+        `${r.label}'s server reused ${r.cachedTokens!.toLocaleString("en-US")} prompt tokens from its cache, so its first word had a head start and is not like for like. Prompt speed is left blank for it.`,
+      );
+    }
+    if (!r.blocked && !r.error && !r.stopped && r.tokens !== null && r.tokens > 0 && r.tokens < 8) {
+      notes.push(
+        `${r.label} wrote only ${r.tokens} token${r.tokens === 1 ? "" : "s"}, so its speed means little. Check that it is answering (a thinking model can use the whole reply length thinking).`,
+      );
+    }
     if (!r.blocked && !r.error && r.failedStreams && r.failedStreams > 0) {
       const ran = r.concurrency ?? 1;
       notes.push(

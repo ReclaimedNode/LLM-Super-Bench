@@ -182,12 +182,15 @@ const CSV_COLUMNS = [
   "total_sec_median",
   "total_sec_min",
   "total_sec_max",
+  "engine",
   "model_file",
   "quant",
   "llama_cpp_build",
   "slots",
   "context_per_slot",
   "machine_notes",
+  "reply_length",
+  "thinking",
 ];
 
 function csvCell(value: string | number | null): string {
@@ -197,7 +200,11 @@ function csvCell(value: string | number | null): string {
 }
 
 /** A spreadsheet-ready table. Blank where a number would have been a guess. */
-export function sweepCsv(rows: SweepRow[], setups: Record<string, MachineSetup> = {}): string {
+export function sweepCsv(
+  rows: SweepRow[],
+  setups: Record<string, MachineSetup> = {},
+  settings: { maxTokens?: number; thinking?: string } = {},
+): string {
   const trio = (s: Spread | null) => [s?.median ?? null, s?.min ?? null, s?.max ?? null];
   const lines = rows.map((r) =>
     [
@@ -213,12 +220,15 @@ export function sweepCsv(rows: SweepRow[], setups: Record<string, MachineSetup> 
       ...trio(r.throughput),
       ...trio(r.promptSpeed),
       ...trio(r.totalSec),
+      setups[r.laneId]?.engine ?? null,
       setups[r.laneId]?.modelFile ?? null,
       setups[r.laneId]?.quant ?? null,
       setups[r.laneId]?.build ?? null,
       setups[r.laneId]?.slots ?? null,
       setups[r.laneId]?.contextPerSlot ?? null,
       setups[r.laneId]?.notes ?? null,
+      settings.maxTokens ?? null,
+      settings.thinking ?? null,
     ]
       .map(csvCell)
       .join(","),
@@ -322,7 +332,7 @@ export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
   const done: SweepDone = {
     type: "sweep-done",
     rows,
-    csv: sweepCsv(rows, opts.laneSetups),
+    csv: sweepCsv(rows, opts.laneSetups, { maxTokens: opts.config.maxTokens, thinking: opts.config.thinking ?? "auto" }),
     complete,
     ...(stoppedByUser ? { stopped: true } : {}),
   };

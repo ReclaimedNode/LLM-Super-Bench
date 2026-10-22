@@ -97,6 +97,12 @@ export function validateConfig(raw: unknown): RaceConfig {
       }
       if (lane.notes.trim() !== "") out.notes = lane.notes.trim();
     }
+    if (lane.engine !== undefined) {
+      if (typeof lane.engine !== "string" || lane.engine.length > 40) {
+        fail(`lane ${i} \`engine\` must be a name of at most 40 characters`);
+      }
+      if (lane.engine.trim() !== "") out.engine = lane.engine.trim();
+    }
     return out;
   });
 

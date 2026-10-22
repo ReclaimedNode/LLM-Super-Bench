@@ -20,6 +20,8 @@ export interface EditedLane {
   label: string;
   baseUrl: string;
   notes?: string;
+  /** Engine name typed in, for servers that cannot be asked. Empty clears it. */
+  engine?: string;
   /** Streams the machine runs at once. A number sets it, null clears it (the machine is asked), absent keeps what was saved. */
   slots?: number | null;
 }
@@ -47,6 +49,8 @@ export function parseEditedLanes(body: unknown): { ok: true; lanes: EditedLane[]
     if (baseUrl === null) return { ok: false, error: `${label} needs an address like http://192.168.1.50:8000.` };
     const notes = typeof row.notes === "string" ? row.notes.trim() : "";
     if (notes.length > 300) return { ok: false, error: `${label}'s notes are longer than 300 characters.` };
+    const engine = typeof row.engine === "string" ? row.engine.trim() : "";
+    if (engine.length > 40) return { ok: false, error: `${label}'s engine name is longer than 40 characters.` };
     let slots: number | null | undefined;
     if (row.slots === null || row.slots === "") slots = null;
     else if (row.slots !== undefined) {
@@ -56,7 +60,7 @@ export function parseEditedLanes(body: unknown): { ok: true; lanes: EditedLane[]
       }
       slots = n;
     }
-    lanes.push({ label, baseUrl, ...(notes ? { notes } : {}), ...(slots !== undefined ? { slots } : {}) });
+    lanes.push({ label, baseUrl, ...(notes ? { notes } : {}), ...(engine ? { engine } : {}), ...(slots !== undefined ? { slots } : {}) });
   }
   return { ok: true, lanes };
 }
@@ -80,6 +84,7 @@ export function mergeLanes(existing: LaneConfig[], edited: EditedLane[], modelId
     if (kept.displayModel === "") delete kept.displayModel;
     if (typeof e.slots === "number") kept.slots = e.slots;
     if (e.notes) kept.notes = e.notes;
+    if (e.engine) kept.engine = e.engine;
     return kept;
   });
 }

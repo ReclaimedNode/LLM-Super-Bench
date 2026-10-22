@@ -37,6 +37,11 @@ export interface LaneConfig {
    * the results, so a published number carries it.
    */
   notes?: string;
+  /**
+   * Which inference engine this is ("TensorFold", "MLX-LM" ...). Read from the server where it can tell us;
+   * type it here for engines that cannot. Saved with the results so a comparison says what ran.
+   */
+  engine?: string;
 }
 
 export interface RaceConfig {

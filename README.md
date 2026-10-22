@@ -401,6 +401,33 @@ curl -N -X POST http://localhost:9500/api/sweep -H 'content-type: application/js
   -d '{"presets":["4k","16k"],"concurrencies":[1,2],"repeats":3}'
 ```
 
+## Engines
+
+Any server with an OpenAI-compatible streaming endpoint can be raced. The machine details panel goes further for engines that report about themselves, and names the engine in the details, the run file, the CSV and the charts:
+
+| Engine | How it is recognised | What is read |
+| --- | --- | --- |
+| llama.cpp (llama-server, llamafile) | `/props` | model file, quant, build, slots, context |
+| vLLM | `/v1/models`, `/version`, `/metrics` | model, version, max sequences, context |
+| Ollama | `/api/version`, `/api/tags`, `/api/ps` | version, quant, loaded context |
+| LM Studio | `/api/v0/models` | GGUF or MLX, quant, loaded context |
+| SGLang | `/get_server_info` | version, model, quant, max running requests, context |
+| KoboldCpp | `/api/extra/version` | version |
+| TGI | `/info` | version, model, max concurrent requests, context |
+| TensorRT-LLM | `/v1/models` (`owned_by`) | name only |
+
+Those endpoints were written from each engine's documentation, not tested against every version, so treat a "not reported" as "this server did not say", and open an issue with the output of that engine's status address if one is wrong.
+
+A server that is not on the list (TensorFold, MLX-LM, LocalAI and others) still races. Type its name into **Engine** under MANAGE MACHINES, or set `"engine": "TensorFold"` on its lane in `race.config.json`; a typed name always wins over a detected one. Use **Notes** for how it was started.
+
+THINKING LOW and OFF send each engine the switch it reads: `chat_template_kwargs` for most, `reasoning_effort` for Ollama. A lane's own `extraBody` always wins, so any engine's own switch can be set there.
+
+### Fair comparison
+
+- Every race starts with a unique run id as the first line of the prompt, so a server's prompt cache cannot hand one machine a head start. If a server still reports cached prompt tokens, the scoreboard says so and leaves prompt speed blank for it.
+- If any machine does not report token counts, speed is shown in streamed chunks for all of them, and a note says so.
+- A machine that writes only a few tokens is flagged, since a speed over three tokens means nothing.
+
 ## Charts and sharing results
 
 When a race or a sweep finishes, a **RESULTS** bar appears under the controls with two buttons:

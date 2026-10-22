@@ -195,16 +195,16 @@ describe("the setup travels with the results", () => {
     });
     const records = await readRecords(logPath);
     const studio = records.find((r) => r.lane === "Studio")!;
-    expect(studio.setup).toEqual({ modelFile: "Foo-Q8_0.gguf", quant: "Q8_0", build: "b1", slots: 2, contextPerSlot: 32768, vision: false, notes: "spec decoding on" });
+    expect(studio.setup).toEqual({ engine: "llama.cpp", modelFile: "Foo-Q8_0.gguf", quant: "Q8_0", build: "b1", slots: 2, contextPerSlot: 32768, vision: false, notes: "spec decoding on" });
     expect(records.find((r) => r.lane === "Box")!.setup).toBeUndefined();
   });
 
   test("the sweep CSV gets the setup columns", () => {
     const result = { laneId: "lane-0", label: "Studio", firstWordSec: 1, lastWordSec: 11, chunks: 101, tokens: 101, totalSec: 11, error: null, blocked: null, promptTokens: 4000, cachedTokens: 0, firstWordField: "content" } as unknown as LaneResult;
     const rows = summarizeCell("4k", 1, [[result]]);
-    const csv = sweepCsv(rows, { "lane-0": { modelFile: "Foo-Q8_0.gguf", quant: "Q8_0", build: "b1", slots: 2, contextPerSlot: 131072, vision: false, notes: "a, b" } });
+    const csv = sweepCsv(rows, { "lane-0": { engine: "llama.cpp", modelFile: "Foo-Q8_0.gguf", quant: "Q8_0", build: "b1", slots: 2, contextPerSlot: 131072, vision: false, notes: "a, b" } }, { maxTokens: 512, thinking: "low" });
     const [head, line] = csv.trimEnd().split("\n");
-    expect(head).toEndWith("model_file,quant,llama_cpp_build,slots,context_per_slot,machine_notes");
-    expect(line).toEndWith('Foo-Q8_0.gguf,Q8_0,b1,2,131072,"a, b"');
+    expect(head).toEndWith("engine,model_file,quant,llama_cpp_build,slots,context_per_slot,machine_notes,reply_length,thinking");
+    expect(line).toEndWith('llama.cpp,Foo-Q8_0.gguf,Q8_0,b1,2,131072,"a, b",512,low');
   });
 });

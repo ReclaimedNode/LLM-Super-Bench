@@ -145,6 +145,8 @@ interface RunStreamsOptions {
   states: LaneState[];
   maxTokens: number;
   thinking?: "auto" | "low" | "off";
+  /** The engine's name, so the thinking switch is sent in the form that engine reads. */
+  engine?: string | null;
   temperature: number;
   timeoutMs: number;
   emit: (event: RaceEvent) => void;
@@ -174,7 +176,7 @@ async function runStreams(o: RunStreamsOptions): Promise<LaneResult> {
     fetchImpl: o.fetchImpl,
     now: o.now,
     // Per-machine request fields from the config, plus the page's thinking switch.
-    extraBody: extraBodyFor(lane, o.thinking),
+    extraBody: extraBodyFor(lane, o.thinking, o.engine ?? lane.engine),
     signal: o.signal,
   };
 
@@ -371,6 +373,7 @@ export async function runRace(opts: RunRaceOptions): Promise<RaceOutcome> {
           states: groups.get(laneId)!,
           maxTokens: config.maxTokens,
           thinking: config.thinking,
+          engine: opts.laneSetups?.[laneId]?.engine ?? lane.engine ?? null,
           temperature: config.temperature,
           timeoutMs: config.requestTimeoutMs,
           emit,

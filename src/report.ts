@@ -130,6 +130,7 @@ export function latestSetups(records: RunLogRecord[]): { lane: string; setup: Ma
 
 export function describeSetup(s: MachineSetup): string {
   const parts = [
+    s.engine,
     s.modelFile ?? "model not reported",
     s.quant,
     s.build ? `build ${s.build}` : null,

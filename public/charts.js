@@ -101,6 +101,7 @@ export function readRunFile(raw) {
       label: text(m?.label, 60),
       model: text(m?.model, 120),
       setup: {
+        engine: text(s.engine, 40) || null,
         modelFile: text(s.modelFile, 120) || null,
         quant: text(s.quant, 30) || null,
         build: text(s.build, 80) || null,
@@ -190,7 +191,7 @@ export function rowsToCsv(series) {
     "throughput_median", "throughput_min", "throughput_max",
     "prompt_speed_median", "prompt_speed_min", "prompt_speed_max",
     "total_median", "total_min", "total_max",
-    "model_file", "quant", "build", "slots", "context_per_slot", "notes", "max_tokens", "thinking",
+    "engine", "model_file", "quant", "build", "slots", "context_per_slot", "notes", "max_tokens", "thinking",
   ];
   const out = [head.join(",")];
   const trio = (s) => (s ? [s.median, s.min, s.max] : ["", "", ""]);
@@ -200,7 +201,7 @@ export function rowsToCsv(series) {
       out.push([
         safeText(s.source), safeText(s.label), r.preset, r.promptTokens, r.concurrency, r.repeats, r.finished, r.speedUnit,
         ...trio(r.firstWordSec), ...trio(r.speed), ...trio(r.throughput), ...trio(r.promptSpeed), ...trio(r.totalSec),
-        safeText(setup.modelFile), setup.quant, safeText(setup.build), setup.slots, setup.contextPerSlot, safeText(setup.notes),
+        safeText(setup.engine), safeText(setup.modelFile), setup.quant, safeText(setup.build), setup.slots, setup.contextPerSlot, safeText(setup.notes),
         s.file.settings.maxTokens, s.file.settings.thinking,
       ].map(csvCell).join(","));
     }

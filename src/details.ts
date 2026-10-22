@@ -22,11 +22,13 @@ import type { LaneConfig } from "./types.ts";
 
 /** The compact, saveable part: goes in the CSV and in every logged run. */
 export interface MachineSetup {
+  /** Which inference engine answers: "llama.cpp", "vLLM", "Ollama" ... Read from the server, or typed in the config. */
+  engine: string | null;
   /** The model file's name, never its folder: the page gets filmed. */
   modelFile: string | null;
   /** Read out of the file name (Q8_0, F16 ...). Null when the name does not say. */
   quant: string | null;
-  /** llama.cpp's own build string. */
+  /** The server's own build or version string (llama.cpp's build, "vLLM 0.x", "Ollama 0.x" ...). */
   build: string | null;
   slots: number | null;
   /** Context for one request, per slot, as the server reports it. */
@@ -55,6 +57,7 @@ export interface MachineDetails extends MachineSetup {
 }
 
 export const EMPTY_SETUP: MachineSetup = {
+  engine: null,
   modelFile: null,
   quant: null,
   build: null,
@@ -122,9 +125,112 @@ export interface DetailsOptions {
   fetchImpl?: Fetcher;
 }
 
+/** What the other engines say about themselves. Every field is null unless that engine answered. */
+export interface ExtraAnswers {
+  /** Ollama: GET /api/version, /api/ps, /api/tags. */
+  ollamaVersion?: unknown | null;
+  ollamaPs?: unknown | null;
+  ollamaTags?: unknown | null;
+  /** LM Studio: GET /api/v0/models. */
+  lmstudio?: unknown | null;
+  /** SGLang: GET /get_server_info. */
+  sglang?: unknown | null;
+  /** KoboldCpp: GET /api/extra/version. */
+  kobold?: unknown | null;
+  /** Text Generation Inference: GET /info. */
+  tgi?: unknown | null;
+}
+
+interface EngineReading {
+  engine: string | null;
+  build: string | null;
+  modelFile: string | null;
+  quant: string | null;
+  slots: number | null;
+  context: number | null;
+}
+
+const NO_ENGINE: EngineReading = { engine: null, build: null, modelFile: null, quant: null, slots: null, context: null };
+
+function entryNamed(list: unknown, id: string | null): Record<string, unknown> | null {
+  const items = Array.isArray(list) ? list : [];
+  const found = items.find((x) => id !== null && (str(obj(x)?.name) === id || str(obj(x)?.model) === id || str(obj(x)?.id) === id));
+  return obj(found ?? items[0]);
+}
+
+/**
+ * Names the engine from what it answered, and reads what that engine reports. A server that answers
+ * none of these stays unnamed: it is "not reported", never a guess. The config's own `engine` wins.
+ */
+export function readEngine(modelId: string | null, first: Record<string, unknown> | null, extra: ExtraAnswers): EngineReading {
+  const ollamaVersion = str(obj(extra.ollamaVersion)?.version);
+  if (ollamaVersion !== null) {
+    const loaded = entryNamed(obj(extra.ollamaPs)?.models, modelId);
+    const installed = entryNamed(obj(extra.ollamaTags)?.models, modelId);
+    const details = obj(installed?.details) ?? obj(loaded?.details);
+    return {
+      engine: "Ollama",
+      build: `Ollama ${ollamaVersion}`,
+      modelFile: modelId,
+      quant: str(details?.quantization_level),
+      slots: null,
+      context: num(loaded?.context_length),
+    };
+  }
+
+  const lmModels = Array.isArray(obj(extra.lmstudio)?.data) ? (obj(extra.lmstudio)!.data as unknown[]) : null;
+  if (lmModels !== null) {
+    const loaded = lmModels.map(obj).find((m) => m && str(m.id) === modelId) ?? lmModels.map(obj).find((m) => m?.state === "loaded") ?? null;
+    const kind = str(loaded?.compatibility_type);
+    return {
+      engine: kind ? `LM Studio (${kind.toUpperCase()})` : "LM Studio",
+      build: null,
+      modelFile: null,
+      quant: str(loaded?.quantization),
+      slots: null,
+      context: num(loaded?.loaded_context_length) ?? num(loaded?.max_context_length),
+    };
+  }
+
+  const sglang = obj(extra.sglang);
+  if (sglang !== null || str(first?.owned_by) === "sglang") {
+    const version = str(sglang?.version);
+    return {
+      engine: "SGLang",
+      build: version ? `SGLang ${version}` : "SGLang",
+      modelFile: str(sglang?.model_path) ? baseName(str(sglang?.model_path)!) : null,
+      quant: str(sglang?.quantization)?.toUpperCase() ?? null,
+      slots: num(sglang?.max_running_requests),
+      context: num(sglang?.context_length),
+    };
+  }
+
+  const kobold = obj(extra.kobold);
+  if (kobold !== null && /kobold/i.test(str(kobold.result) ?? "")) {
+    const version = str(kobold.version);
+    return { ...NO_ENGINE, engine: "KoboldCpp", build: version ? `KoboldCpp ${version}` : "KoboldCpp" };
+  }
+
+  const tgi = obj(extra.tgi);
+  if (tgi !== null && str(tgi.model_id) !== null) {
+    const version = str(tgi.version);
+    return {
+      engine: "TGI",
+      build: version ? `TGI ${version}` : "TGI",
+      modelFile: baseName(str(tgi.model_id)!),
+      quant: null,
+      slots: num(tgi.max_concurrent_requests),
+      context: num(tgi.max_total_tokens),
+    };
+  }
+
+  if (str(first?.owned_by) === "tensorrt_llm") return { ...NO_ENGINE, engine: "TensorRT-LLM" };
+  return NO_ENGINE;
+}
+
 /** Reads the three answers into one record. Pure, so it can be tested without a server. */
 export function readDetails(
-  lane: Pick<LaneConfig, "label" | "slots" | "notes">,
+  lane: Pick<LaneConfig, "label" | "slots" | "notes" | "engine">,
   laneId: string,
   answers: {
     props: unknown | null;
@@ -133,6 +239,8 @@ export function readDetails(
     /** vLLM's GET /version, and the text of its GET /metrics. Both optional. */
     version?: unknown | null;
     metrics?: string | null;
+    /** Answers from other engines' own endpoints. Each is null when that endpoint is not there. */
+    extra?: ExtraAnswers;
   },
 ): MachineDetails {
   const props = obj(answers.props);
@@ -155,6 +263,9 @@ export function readDetails(
   const maxSeqs = answers.metrics ? /max_num_seqs="(\d+)"/.exec(answers.metrics) : null;
   const metricSlots = maxSeqs && Number(maxSeqs[1]) > 0 ? Number(maxSeqs[1]) : null;
 
+  const other = readEngine(str(first?.id), first, answers.extra ?? {});
+  const engine = lane.engine ?? (props !== null && (props.model_path !== undefined || props.build_info !== undefined) ? "llama.cpp" : vllm ? "vLLM" : other.engine);
+
   const modalities = obj(props?.modalities);
   const vision = typeof modalities?.vision === "boolean" ? modalities.vision : null;
 
@@ -173,13 +284,14 @@ export function readDetails(
   return {
     laneId,
     label: lane.label,
-    reachable: answers.props !== null || answers.slots !== null || answers.models !== null,
-    modelFile,
-    quant: quantOf(modelFile),
-    build,
-    slots: capacity.slots ?? metricSlots,
-    slotsSource: capacity.slots === null && metricSlots !== null ? "server" : capacity.source,
-    contextPerSlot,
+    reachable: answers.props !== null || answers.slots !== null || answers.models !== null || other.engine !== null,
+    engine,
+    modelFile: modelFile ?? other.modelFile,
+    quant: quantOf(modelFile) ?? other.quant ?? quantOf(other.modelFile),
+    build: build ?? other.build,
+    slots: capacity.slots ?? metricSlots ?? other.slots,
+    slotsSource: capacity.slots === null && (metricSlots !== null || other.slots !== null) ? "server" : capacity.source,
+    contextPerSlot: contextPerSlot ?? other.context,
     slotContexts: slotContexts && slotContexts.length > 0 ? slotContexts : null,
     vision,
     notes: lane.notes ?? null,
@@ -202,17 +314,30 @@ export async function probeDetails(lane: LaneConfig, laneId: string, opts: Detai
   // vLLM only: asked after the rest, and only when /props did not answer, so a llama-server is not bothered.
   let version: unknown | null = null;
   let metrics: string | null = null;
+  const extra: ExtraAnswers = {};
   if (props === null) {
-    [version, metrics] = await Promise.all([
-      getJson(lane, "/version", timeoutMs, fetchImpl),
+    // Every other engine has its own status address; each that is not there just answers 404.
+    const ask = (path: string) => getJson(lane, path, timeoutMs, fetchImpl);
+    let ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi;
+    [version, metrics, ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi] = await Promise.all([
+      ask("/version"),
       getText(lane, "/metrics", timeoutMs, fetchImpl),
+      ask("/api/version"),
+      ask("/api/ps"),
+      ask("/api/tags"),
+      ask("/api/v0/models"),
+      ask("/get_server_info"),
+      ask("/api/extra/version"),
+      ask("/info"),
     ]);
+    Object.assign(extra, { ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi });
   }
-  return readDetails(lane, laneId, { props, slots, models, version, metrics });
+  return readDetails(lane, laneId, { props, slots, models, version, metrics, extra });
 }
 
 export function setupOf(d: MachineDetails): MachineSetup {
   return {
+    engine: d.engine,
     modelFile: d.modelFile,
     quant: d.quant,
     build: d.build,
@@ -241,6 +366,7 @@ export function differences(details: MachineDetails[]): string[] {
     }
   };
 
+  check("Engine", (d) => d.engine);
   check("Model file", (d) => d.modelFile);
   check("Quantization", (d) => d.quant);
   check("Server build", (d) => d.build);

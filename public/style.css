@@ -605,7 +605,7 @@ main {
 
 .editor-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) minmax(14rem, 2fr) minmax(10rem, 2fr) minmax(7rem, 1fr);
+  grid-template-columns: minmax(8rem, 1fr) minmax(14rem, 2fr) minmax(10rem, 2fr) minmax(9rem, 1fr) minmax(7rem, 1fr);
   gap: 0.6rem;
   align-items: start;
 }

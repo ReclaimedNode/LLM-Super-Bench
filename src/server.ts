@@ -284,7 +284,7 @@ const server = Bun.serve({
 
       if (url.pathname === "/api/lanes-config" && req.method === "GET") {
         return Response.json({
-          lanes: config.lanes.map((l) => ({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", slots: l.slots ?? null })),
+          lanes: config.lanes.map((l) => ({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", engine: l.engine ?? "", slots: l.slots ?? null })),
           minMachines: 1,
           maxMachines: 4,
         });
