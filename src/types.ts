@@ -43,7 +43,7 @@ export interface RaceConfig {
   port: number;
   maxTokens: number;
   /** "off" sends every machine the switch that turns thinking off. Absent or "auto" leaves the model as it is. */
-  thinking?: "auto" | "off";
+  thinking?: "auto" | "low" | "off";
   temperature: number;
   /** Characters per token used to size the 8K / 32K presets. Approximate by definition. */
   charsPerToken: number;

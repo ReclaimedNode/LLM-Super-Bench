@@ -144,7 +144,7 @@ interface RunStreamsOptions {
   prompts: string[];
   states: LaneState[];
   maxTokens: number;
-  thinking?: "auto" | "off";
+  thinking?: "auto" | "low" | "off";
   temperature: number;
   timeoutMs: number;
   emit: (event: RaceEvent) => void;

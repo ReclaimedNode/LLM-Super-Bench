@@ -452,7 +452,9 @@ function paintSettings() {
   el.replyNote.textContent = `Each machine may write up to ${currentReply.toLocaleString("en-US")} tokens.`;
   el.thinkingNote.textContent = currentThinking === "off"
     ? "Every machine is asked not to think. A model whose template ignores this still will."
-    : "The model is left as it is. A thinking model can use its whole reply thinking.";
+    : currentThinking === "low"
+      ? "Every machine is asked for the least reasoning it offers (reasoning_effort low). A model without that setting ignores it."
+      : "The model is left as it is. A thinking model can use its whole reply thinking.";
 }
 
 function buildSettings(config) {
@@ -487,6 +489,7 @@ function buildSettings(config) {
   })));
   thinkingButtons = mk(el.thinkingSwitch, [
     { label: "AUTO", title: "leave the model as it is", thinking: "auto", change: { thinking: "auto" } },
+    { label: "LOW", title: "ask every machine for the least reasoning (reasoning_effort low)", thinking: "low", change: { thinking: "low" } },
     { label: "OFF", title: "ask every machine not to think", thinking: "off", change: { thinking: "off" } },
   ]);
   paintSettings();
@@ -501,7 +504,7 @@ function warnAboutThinking() {
   if (spent.length === 0) return;
   logLine(
     `${spent.join(" and ")} spent the whole reply thinking and never answered, so its speed is thinking speed. ` +
-      "Set THINKING to OFF, or pick a longer REPLY LENGTH, and run again.",
+      "Set THINKING to LOW or OFF, or pick a longer REPLY LENGTH, and run again.",
     "bad",
   );
 }

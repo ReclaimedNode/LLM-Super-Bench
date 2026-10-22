@@ -15,7 +15,7 @@ describe("the page has the controls, and every id they use exists", () => {
 
   test("a machine that only thought gets told, with the way out", () => {
     expect(js).toContain("view.sawThinking && !view.sawReply");
-    expect(js).toContain("Set THINKING to OFF");
+    expect(js).toContain("Set THINKING to LOW or OFF");
   });
 
   test("the streams-at-once box is sent as a number or null", () => {

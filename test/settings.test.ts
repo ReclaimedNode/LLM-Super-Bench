@@ -16,6 +16,7 @@ describe("reply length and thinking are asked for, and checked", () => {
       const r = parseSettings(bad);
       expect(r.ok).toBe(false);
     }
+    expect(parseSettings({ thinking: "low" })).toEqual({ ok: true, change: { thinking: "low" } });
     expect(parseSettings({ thinking: "maybe" }).ok).toBe(false);
     expect(parseSettings({}).ok).toBe(false);
   });
@@ -24,6 +25,10 @@ describe("reply length and thinking are asked for, and checked", () => {
     expect(extraBodyFor({}, "auto")).toBeUndefined();
     expect(extraBodyFor({}, undefined)).toBeUndefined();
     expect(extraBodyFor({}, "off")).toEqual({ chat_template_kwargs: { enable_thinking: false } });
+    expect(extraBodyFor({}, "low")).toEqual({ chat_template_kwargs: { reasoning_effort: "low" } });
+    expect(extraBodyFor({ extraBody: { chat_template_kwargs: { reasoning_effort: "high" } } }, "low")).toEqual({
+      chat_template_kwargs: { reasoning_effort: "high" },
+    });
     expect(extraBodyFor({ extraBody: { top_k: 5 } }, "off")).toEqual({ top_k: 5, chat_template_kwargs: { enable_thinking: false } });
     expect(extraBodyFor({ extraBody: { chat_template_kwargs: { enable_thinking: true, x: 1 } } }, "off")).toEqual({
       chat_template_kwargs: { enable_thinking: true, x: 1 },
@@ -88,7 +93,7 @@ describe("a race really sends the setting", () => {
     const { runRace } = await import("../src/race.ts");
     const servers = [startMockLane({ port: 0, firstWordDelayMs: 5, chunkIntervalMs: 1, chunks: 5 }), startMockLane({ port: 0, firstWordDelayMs: 5, chunkIntervalMs: 1, chunks: 5 })];
     try {
-      const run = async (thinking: "off" | "auto") => {
+      const run = async (thinking: "off" | "low" | "auto") => {
         const bodies: Record<string, unknown>[] = [];
         const fetchImpl = (async (input: string, init?: RequestInit) => {
           if (init?.method === "POST") bodies.push(JSON.parse(String(init.body)));
@@ -108,6 +113,8 @@ describe("a race really sends the setting", () => {
         expect(b.chat_template_kwargs).toEqual({ enable_thinking: false });
         expect(b.max_tokens).toBe(777);
       }
+      const low = await run("low");
+      for (const b of low) expect(b.chat_template_kwargs).toEqual({ reasoning_effort: "low" });
       const auto = await run("auto");
       for (const b of auto) expect(b.chat_template_kwargs).toBeUndefined();
     } finally {

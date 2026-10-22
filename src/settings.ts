@@ -16,7 +16,8 @@ export const REPLY_LENGTHS = [512, 1024, 2048, 4096, 8192];
 const MIN_REPLY = 64;
 const MAX_REPLY = 32768;
 
-export type Thinking = "auto" | "off";
+/** auto: leave the model alone. low: ask for the least reasoning it offers. off: ask it not to think. */
+export type Thinking = "auto" | "low" | "off";
 
 export interface SettingsChange {
   maxTokens?: number;
@@ -34,8 +35,8 @@ export function parseSettings(body: unknown): { ok: true; change: SettingsChange
     change.maxTokens = n;
   }
   if (b.thinking !== undefined) {
-    if (b.thinking !== "auto" && b.thinking !== "off") {
-      return { ok: false, error: 'Thinking must be "auto" (leave the model as it is) or "off".' };
+    if (b.thinking !== "auto" && b.thinking !== "low" && b.thinking !== "off") {
+      return { ok: false, error: 'Thinking must be "auto" (leave the model as it is), "low" or "off".' };
     }
     change.thinking = b.thinking;
   }
@@ -50,14 +51,14 @@ export function parseSettings(body: unknown): { ok: true; change: SettingsChange
  * same switch; a field the machine's own `extraBody` already sets for itself wins.
  */
 export function extraBodyFor(lane: Pick<LaneConfig, "extraBody">, thinking: Thinking | undefined): Record<string, unknown> | undefined {
-  if (thinking !== "off") return lane.extraBody;
+  if (thinking !== "off" && thinking !== "low") return lane.extraBody;
   const own = lane.extraBody ?? {};
   const kwargs = typeof own.chat_template_kwargs === "object" && own.chat_template_kwargs !== null
     ? (own.chat_template_kwargs as Record<string, unknown>)
     : {};
   return {
     ...own,
-    chat_template_kwargs: { enable_thinking: false, ...kwargs },
+    chat_template_kwargs: { ...(thinking === "off" ? { enable_thinking: false } : { reasoning_effort: "low" }), ...kwargs },
   };
 }
 

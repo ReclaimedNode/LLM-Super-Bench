@@ -405,8 +405,8 @@ curl -N -X POST http://localhost:9500/api/sweep -H 'content-type: application/js
 
 **REPLY LENGTH** and **THINKING** at the top of the page set these for every machine, so nothing
 here needs the config file. REPLY LENGTH is how many tokens each machine may write. THINKING **OFF**
-asks every machine not to think (`chat_template_kwargs: {enable_thinking: false}`); **AUTO** leaves
-the model as it is. Both are saved to `race.config.json` and need the password. If a machine spends
+asks every machine not to think (`chat_template_kwargs: {enable_thinking: false}`); **LOW** asks for the least reasoning the model offers (`reasoning_effort: low`, which
+GLM-style templates read); **AUTO** leaves the model as it is. Both are saved to `race.config.json` and need the password. If a machine spends
 its whole reply thinking and never answers, the page says so after the race. Each machine row under
 MANAGE MACHINES also has **Streams at once**, for servers such as vLLM that cannot report it (leave it
 empty for llama-server, which can).

@@ -110,9 +110,9 @@ export function validateConfig(raw: unknown): RaceConfig {
     return v;
   };
 
-  const thinkingOf = (v: unknown): "auto" | "off" => {
-    if (v !== "auto" && v !== "off") fail('`thinking` must be "auto" or "off"');
-    return v as "auto" | "off";
+  const thinkingOf = (v: unknown): "auto" | "low" | "off" => {
+    if (v !== "auto" && v !== "low" && v !== "off") fail('`thinking` must be "auto", "low" or "off"');
+    return v as "auto" | "low" | "off";
   };
 
   const promptFile = typeof obj.promptFile === "string" && obj.promptFile.trim() !== ""
