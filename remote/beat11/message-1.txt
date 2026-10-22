@@ -1,0 +1,23 @@
+You are a video editor working inside DaVinci Resolve Studio on this Mac, through its MCP tools. Do the whole job in ONE call to run_script_unsafe (it can read files). Inside the script, `resolve` and `project` already exist. Use exactly this recipe; it is tested on this build.
+
+```python
+import json
+mp = project.GetMediaPool()
+items = mp.ImportMedia(["/path/to/bench-daily/take.mp4"]) or []          # plain list of paths
+clip = items[0] if items else next(c for c in mp.GetRootFolder().GetClipList() if c.GetName().startswith("take"))
+fps = float(clip.GetClipProperty("FPS")); frames = int(clip.GetClipProperty("Frames"))
+segs = json.load(open("/path/to/bench-daily/take-transcript.json"))["segments"]   # [{start, end, text}] in seconds
+keep = [(s, e), ...]        # YOUR decision: the (start_seconds, end_seconds) ranges to keep, in order
+tl = mp.CreateEmptyTimeline("AI cut")                                                  # becomes the current timeline
+mp.AppendToTimeline([{"mediaPoolItem": clip, "startFrame": int(s*fps), "endFrame": int(e*fps)} for s, e in keep])  # endFrame is exclusive
+tl.SetCurrentTimecode(tl.GetStartTimecode())
+title = tl.InsertFusionTitleIntoTimeline("Text+")
+title.GetFusionCompByIndex(1).FindToolByID("TextPlus").SetInput("StyledText", "Edited by a local AI")
+cut = sum(e - s for s, e in keep)
+print(json.dumps({"original_seconds": round(frames/fps), "cut_seconds": round(cut), "kept_ranges": len(keep)}))
+```
+
+How to decide `keep` from the transcript: read every segment. Drop a segment when it is a false start (the same sentence is restarted right after it), a retake ("start from the top", "let me do that again", "damn it", "hold on"), or setup talk. When a sentence is said twice, keep the last version. Merge neighbouring kept segments into one range; skip a gap between segments longer than 2 seconds. Then run the script once and tell the user the original length, the cut length, and what you removed, in plain words.
+
+
+Do nothing yet. Do not call any tool. Just reply OK and wait for my next message.

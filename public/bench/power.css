@@ -1,0 +1,182 @@
+/*
+  Power pass layout only. Colours and type sizes come from the variables in
+  bench.css.
+
+  This page is read across a room by somebody holding a meter in one hand, so
+  the one instruction is the biggest thing on it.
+*/
+
+.stage {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+  justify-content: center;
+  min-height: 0;
+}
+
+.action {
+  background: var(--nc-orange);
+  color: var(--ink-on-light);
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-big);
+  line-height: 1.2;
+  margin: 0;
+  padding: clamp(1rem, 2vw, 2.5rem) clamp(1rem, 1.6vw, 1.75rem);
+  overflow-wrap: anywhere;
+}
+
+/* The one moment that matters: the meter is to be read NOW. */
+.action.now {
+  background: var(--nc-cream);
+  color: var(--ink-on-light);
+  border: clamp(4px, 0.5vw, 8px) solid var(--nc-red);
+  font-size: var(--size-huge);
+}
+
+.action.done {
+  background: var(--good);
+}
+
+.countdown {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  background: var(--panel);
+  border: var(--border) solid var(--edge);
+  padding: var(--pad) clamp(1rem, 1.6vw, 1.75rem);
+}
+
+.countdown-value {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--size-huge);
+  line-height: 1;
+  color: var(--nc-orange);
+}
+
+.countdown-name {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+/* ---------------------------------------------------------------- form */
+
+.reading {
+  background: var(--panel);
+  border: var(--border) solid var(--edge);
+  padding: var(--pad) clamp(1rem, 1.6vw, 1.75rem);
+}
+
+.reading-label {
+  display: block;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 0.4em;
+}
+
+.reading-row {
+  display: flex;
+  gap: var(--gap);
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+.reading-input {
+  flex: 1;
+  min-width: 8ch;
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--size-huge);
+  line-height: 1;
+  color: var(--nc-cream);
+  background: var(--panel-sunk);
+  border: var(--border) solid var(--edge);
+  padding: 0.2em 0.4em;
+}
+
+.reading-input:focus {
+  outline: none;
+  border-color: var(--nc-orange);
+}
+
+.reading-submit,
+.reading-skip {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-mid);
+  letter-spacing: 0.06em;
+  border: var(--border) solid var(--edge);
+  padding: 0.5em 1.2em;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.reading-submit {
+  background: var(--nc-orange);
+  border-color: var(--nc-orange);
+  color: var(--ink-on-light);
+}
+
+.reading-submit:hover {
+  background: var(--nc-gold);
+  border-color: var(--nc-gold);
+}
+
+.reading-skip {
+  background: transparent;
+  color: var(--dim);
+}
+
+.reading-skip:hover {
+  border-color: var(--nc-red);
+  color: var(--nc-red);
+}
+
+.reading-note {
+  font-size: var(--size-small);
+  color: var(--dim);
+  margin: 0.8em 0 0;
+}
+
+/* ---------------------------------------------------------------- table */
+
+.readings {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--size-small);
+}
+
+.readings th,
+.readings td {
+  text-align: left;
+  padding: 0.35em 0.7em 0.35em 0;
+  border-bottom: 1px solid var(--edge);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.readings th {
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+@media (max-width: 700px) {
+  .reading-row {
+    flex-direction: column;
+  }
+}

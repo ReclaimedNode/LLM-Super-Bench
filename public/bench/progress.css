@@ -1,0 +1,190 @@
+/*
+  Progress page layout only. Every colour and size it uses is a variable from
+  bench.css, so the look can be changed there without touching this file.
+*/
+
+.action-bar {
+  margin: 0;
+  background: var(--nc-orange);
+  color: var(--ink-on-light);
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-mid);
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+  padding: var(--pad) clamp(1rem, 1.6vw, 1.75rem);
+  overflow-wrap: anywhere;
+}
+
+.lane-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--lane-count, 2), minmax(0, 1fr));
+  gap: var(--gap);
+  min-height: 0;
+  align-content: start;
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  padding-top: 0;
+  min-width: 0;
+}
+
+.lane-rule {
+  height: clamp(0.5rem, 0.65vw, 0.8rem);
+  background: var(--lane-color, var(--nc-orange));
+  margin: 0 clamp(-1.75rem, -1.6vw, -1rem);
+}
+
+.lane-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding-top: var(--pad);
+}
+
+.lane-label {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-big);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  margin: 0 auto 0 0;
+  color: var(--lane-color, var(--nc-orange));
+  overflow-wrap: anywhere;
+}
+
+.lane-phase.running {
+  color: var(--nc-orange);
+}
+.lane-phase.waiting-human {
+  color: var(--bad);
+}
+.lane-phase.done {
+  color: var(--good);
+}
+.lane-phase.failed {
+  color: var(--bad);
+}
+
+.lane-model {
+  font-size: var(--size-body);
+  font-weight: 600;
+  color: var(--dim);
+  margin: 0.5em 0 0;
+  overflow-wrap: anywhere;
+}
+
+.lane-cell {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--size-mid);
+  line-height: 1.2;
+  margin: 0.2em 0 0;
+  overflow-wrap: anywhere;
+}
+
+.meters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+  margin-top: var(--pad);
+}
+
+.meter {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.meter-name {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.meter-value {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--size-huge);
+  line-height: 0.95;
+  color: var(--nc-cream);
+}
+
+.bar-track {
+  height: clamp(0.4rem, 0.55vw, 0.7rem);
+  background: var(--panel-sunk);
+  border: var(--border) solid var(--edge);
+  margin-top: 0.4em;
+}
+
+.bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--lane-color, var(--nc-orange));
+}
+
+.lane-recent {
+  list-style: none;
+  margin: var(--pad) 0 0;
+  padding: 0;
+  font-size: var(--size-small);
+  font-family: var(--font-mono);
+  line-height: 1.5;
+  display: grid;
+  gap: 0.2em;
+}
+
+.lane-recent li {
+  overflow-wrap: anywhere;
+  color: var(--dim);
+}
+
+.lane-recent li.good {
+  color: var(--nc-cream);
+}
+.lane-recent li.warn {
+  color: var(--warn);
+}
+.lane-recent li.bad {
+  color: var(--bad);
+}
+
+.log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  line-height: 1.5;
+  max-height: calc(6 * 1.5em);
+  overflow-y: auto;
+}
+
+.log li {
+  color: var(--nc-cream);
+  overflow-wrap: anywhere;
+}
+.log li.warn {
+  color: var(--warn);
+}
+.log li.bad {
+  color: var(--bad);
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .lane-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .meters {
+    grid-template-columns: 1fr;
+  }
+}

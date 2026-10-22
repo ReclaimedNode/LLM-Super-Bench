@@ -1,0 +1,359 @@
+/*
+  Results board layout only. Every colour and size comes from the variables in
+  bench.css, so the whole look can be restyled there without touching a single
+  rule in this file.
+*/
+
+.legend {
+  display: flex;
+  gap: clamp(0.75rem, 1.4vw, 1.75rem);
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--size-mid);
+  line-height: 1;
+}
+
+.legend-swatch {
+  width: clamp(1rem, 1.4vw, 1.6rem);
+  height: clamp(1rem, 1.4vw, 1.6rem);
+  flex: none;
+}
+
+.legend-kind {
+  font-size: var(--size-small);
+  font-weight: 600;
+  color: var(--dim);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+/* ---------------------------------------------------------------- warnings */
+
+.warnings {
+  list-style: none;
+  margin: 0;
+  padding: var(--pad) clamp(1rem, 1.6vw, 1.75rem);
+  background: var(--panel);
+  border: var(--border) solid var(--bad);
+  display: grid;
+  gap: 0.4em;
+}
+
+/* `display: grid` beats the browser's own [hidden] rule, so hiding an empty
+   warnings box needs saying explicitly. Without this the board shows an empty
+   red panel on a run where nothing went wrong. */
+.warnings[hidden] {
+  display: none;
+}
+
+.warnings li {
+  font-size: var(--size-body);
+  font-weight: 600;
+  color: var(--bad);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- model */
+
+main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+.model {
+  background: var(--panel);
+  border: var(--border) solid var(--edge);
+  padding: 0 clamp(1rem, 1.6vw, 1.75rem) var(--pad);
+}
+
+.model-rule {
+  height: clamp(0.5rem, 0.65vw, 0.8rem);
+  background: var(--nc-orange);
+  margin: 0 clamp(-1.75rem, -1.6vw, -1rem);
+}
+
+.model-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding-top: var(--pad);
+}
+
+.model-name {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-title);
+  line-height: 1;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.model-spec {
+  font-size: var(--size-label);
+  font-weight: 600;
+  color: var(--dim);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.headline {
+  background: var(--nc-cream);
+  color: var(--ink-on-light);
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-mid);
+  line-height: 1.25;
+  margin: var(--pad) clamp(-1.75rem, -1.6vw, -1rem) 0;
+  padding: var(--pad) clamp(1rem, 1.6vw, 1.75rem);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- rows */
+
+.size-row {
+  margin-top: var(--pad);
+  border-top: var(--border) solid var(--edge);
+  padding-top: var(--pad);
+}
+
+.size-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.5em;
+}
+
+.size-label {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-big);
+  line-height: 1;
+  color: var(--nc-cream);
+}
+
+.size-sub {
+  font-size: var(--size-small);
+  font-weight: 600;
+  color: var(--dim);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+}
+
+.twin {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--gap);
+}
+
+.chart {
+  min-width: 0;
+}
+
+.chart-title {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  margin: 0 0 0.4em;
+}
+
+.chart-title.reading {
+  color: var(--reading);
+}
+.chart-title.writing {
+  color: var(--writing);
+}
+
+.chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cell-notes {
+  list-style: none;
+  margin: 0.6em 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.25em;
+}
+
+.cell-notes li {
+  font-size: var(--size-small);
+  font-weight: 600;
+  color: var(--warn);
+  border-left: 4px solid var(--warn);
+  padding-left: 0.6rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- svg text */
+
+.svg-value {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: 15px;
+  fill: var(--ink-on-light);
+}
+
+.svg-value.outside {
+  fill: var(--nc-cream);
+}
+
+.svg-lane {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  fill: var(--nc-cream);
+}
+
+.svg-axis {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12px;
+  fill: var(--dim);
+}
+
+.svg-mark {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 12px;
+  fill: var(--bad);
+}
+
+.svg-grid {
+  stroke: var(--edge);
+  stroke-width: 1;
+}
+
+.svg-range {
+  stroke: var(--panel-sunk);
+  stroke-width: 2.5;
+  fill: none;
+}
+
+.svg-baseline {
+  stroke: var(--edge);
+  stroke-width: 2;
+}
+
+/* ---------------------------------------------------------------- images */
+
+/* The generated pictures, side by side. Same seed everywhere, so they are
+   evidence rather than decoration: a viewer can see whether the lanes really
+   drew the same thing. */
+.image-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--gap);
+  margin-top: var(--pad);
+}
+
+.image-proof {
+  margin: 0;
+  min-width: 0;
+}
+
+.image-proof img,
+.image-proof video {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: var(--border) solid var(--edge);
+  background: var(--panel-sunk);
+}
+
+.image-proof figcaption {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--size-label);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  margin-top: 0.4em;
+}
+
+/* ---------------------------------------------------------------- tables */
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.6em;
+  font-size: var(--size-small);
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  padding: 0.4em 0.7em 0.4em 0;
+  border-bottom: 1px solid var(--edge);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.data-table th {
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--dim);
+}
+
+.data-table td.unavailable {
+  color: var(--warn);
+}
+
+/* ---------------------------------------------------------------- footer */
+
+.footer {
+  font-size: var(--size-small);
+}
+
+/* The grid's items are the PAIRS, never a loose label or a loose value, so a
+   label can never end one row with its value orphaned at the start of the
+   next. */
+.footer dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--pad) var(--gap);
+  margin: 0;
+}
+
+.footer-pair {
+  /* Without this a long unbroken value (the software version string) widens
+     its own column instead of wrapping inside it. */
+  min-width: 0;
+}
+
+.footer dt {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: var(--size-small);
+  letter-spacing: var(--track-label);
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 0.3em;
+}
+
+.footer dd {
+  margin: 0;
+  color: var(--nc-cream);
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1000px) {
+  .twin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

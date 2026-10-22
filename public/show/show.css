@@ -1,0 +1,549 @@
+/*
+  The same broadcast graphics as the race page, for the same camera. The rules
+  that matter are unchanged:
+    - it is filmed at 4K and watched on a phone, so numerals are enormous
+      and nothing that carries meaning is small or grey
+    - NetworkChuck palette: NC Orange, Rich Black, White Yellow, Light Cyan,
+      Olive Yellow, Gold, Red Orange
+    - local and system fonts only; the page makes zero network requests
+
+  What this page adds over the race page is the lane's result block: one big
+  number, the extras under it, and whatever the machine made -- a picture, a
+  clip, or a block of text -- shown inside the lane at lane width.
+*/
+
+:root {
+  --nc-orange: #f1a21a;
+  --nc-black: #1e1f21;
+  --nc-cream: #f1efe4;
+  --nc-olive: #c2ba51;
+  --nc-cyan: #c0dcdf;
+  --nc-gold: #ca9f43;
+  --nc-red: #ca3b0f;
+
+  --bg: #121315;
+  --panel: #1e1f21;
+  --edge: #34363a;
+  --dim: #a9a79d;
+
+  /* Archivo and Inter if the machine has them; system stack otherwise.
+     Never a web font: that would be a network request. */
+  --font-head: "Archivo", "Archivo Black", "Helvetica Neue", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--nc-cream);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.2vw, 1.5rem);
+  padding: clamp(0.75rem, 1.2vw, 1.5rem);
+}
+
+/* ---------------------------------------------------------------- header */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2vw, 2.5rem);
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  padding: clamp(0.75rem, 1.2vw, 1.25rem) clamp(1rem, 1.6vw, 1.75rem);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-right: auto;
+}
+
+.brand-mark {
+  width: clamp(0.85rem, 1.1vw, 1.3rem);
+  height: clamp(2rem, 3vw, 3.25rem);
+  background: var(--nc-orange);
+  flex: none;
+}
+
+h1 {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.6rem, 2.8vw, 3.25rem);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin: 0;
+  color: var(--nc-cream);
+}
+
+.presets {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.presets button {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(1rem, 1.35vw, 1.6rem);
+  letter-spacing: 0.04em;
+  color: var(--nc-cream);
+  background: transparent;
+  border: 2px solid var(--edge);
+  padding: 0.5em 1em;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.presets button:hover:not(:disabled) {
+  border-color: var(--nc-gold);
+}
+
+.presets button[aria-pressed="true"] {
+  background: var(--nc-cream);
+  border-color: var(--nc-cream);
+  color: var(--nc-black);
+}
+
+.presets button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.choices button {
+  font-size: clamp(0.9rem, 1.15vw, 1.35rem);
+}
+
+.start {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.25rem, 2vw, 2.4rem);
+  letter-spacing: 0.06em;
+  color: var(--nc-black);
+  background: var(--nc-orange);
+  border: none;
+  padding: 0.45em 1.4em;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.start:hover:not(:disabled) {
+  background: var(--nc-gold);
+}
+
+.start:disabled {
+  background: var(--edge);
+  color: var(--dim);
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- setup */
+
+.setup {
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  padding: clamp(0.6rem, 0.9vw, 1rem) clamp(1rem, 1.6vw, 1.75rem);
+  display: grid;
+  gap: clamp(0.5rem, 0.8vw, 0.9rem);
+}
+
+.about {
+  margin: 0;
+  font-size: clamp(0.95rem, 1.15vw, 1.45rem);
+  font-weight: 600;
+  color: var(--nc-cream);
+  overflow-wrap: anywhere;
+}
+
+.setup-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(0.5rem, 1vw, 1.25rem);
+  flex-wrap: wrap;
+}
+
+.prompt {
+  flex: 1;
+  min-width: 16rem;
+  font-family: var(--font-body);
+  font-size: clamp(1rem, 1.35vw, 1.7rem);
+  font-weight: 600;
+  color: var(--nc-cream);
+  background: #0c0d0e;
+  border: 2px solid var(--edge);
+  padding: 0.5em 0.7em;
+}
+
+.prompt:focus {
+  outline: none;
+  border-color: var(--nc-orange);
+}
+
+.prompt::placeholder {
+  color: var(--dim);
+  font-weight: 500;
+}
+
+/* ---------------------------------------------------------------- lanes */
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.2vw, 1.5rem);
+  min-height: 0;
+}
+
+.lanes {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--lane-count, 2), minmax(0, 1fr));
+  gap: clamp(0.75rem, 1.2vw, 1.5rem);
+  min-height: 0;
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  padding: 0 clamp(1rem, 1.6vw, 1.75rem) clamp(1rem, 1.4vw, 1.5rem);
+}
+
+.lane-rule {
+  height: clamp(0.5rem, 0.65vw, 0.8rem);
+  background: var(--lane-color, var(--nc-orange));
+  margin: 0 clamp(-1.75rem, -1.6vw, -1rem);
+}
+
+.lane-head {
+  padding-top: clamp(0.75rem, 1.1vw, 1.25rem);
+}
+
+.lane-label {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.8rem, 3.2vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--lane-color, var(--nc-orange));
+  overflow-wrap: anywhere;
+}
+
+/* The live strip: what the chip in this lane is doing, right now. Small and
+   quiet next to the clock and the big number -- it is context, not the result
+   -- but monospace with tabular numerals so the digits do not jitter as they
+   change twice a second, and in the lane's own colour so a camera framing one
+   lane knows whose numbers these are. */
+.strip {
+  list-style: none;
+  margin: clamp(0.4rem, 0.7vw, 0.8rem) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 clamp(0.75rem, 1.2vw, 1.5rem);
+}
+
+.strip li {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4em;
+}
+
+.strip-key {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(0.65rem, 0.75vw, 0.9rem);
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  white-space: nowrap;
+}
+
+.strip-value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(0.85rem, 1vw, 1.2rem);
+  line-height: 1.4;
+  color: var(--lane-color, var(--nc-orange));
+  white-space: nowrap;
+}
+
+.clockrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: clamp(0.5rem, 0.9vw, 1rem);
+}
+
+.clock {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.8rem, 3vw, 3.6rem);
+  line-height: 1;
+  color: var(--nc-cream);
+}
+
+.lane-status {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(0.8rem, 0.95vw, 1.15rem);
+  letter-spacing: 0.1em;
+  color: var(--nc-cream);
+}
+
+.lane-status.running {
+  color: var(--nc-orange);
+}
+
+.lane-status.done {
+  color: var(--nc-cyan);
+}
+
+.lane-status.failed {
+  color: var(--nc-red);
+}
+
+/* ---------------------------------------------------------------- result */
+
+.result {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  margin-top: clamp(0.5rem, 0.9vw, 1rem);
+  overflow-y: auto;
+}
+
+.stat-value {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2.6rem, 5.5vw, 7rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--nc-cream);
+}
+
+.stat-value.lit {
+  color: var(--lane-color, var(--nc-orange));
+}
+
+.stat-unit {
+  font-size: clamp(0.9rem, 1.05vw, 1.3rem);
+  font-weight: 600;
+  color: var(--nc-cream);
+  min-height: 1.4em;
+  overflow-wrap: anywhere;
+}
+
+.extras {
+  list-style: none;
+  margin: 0.35em 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.2em;
+}
+
+.extras li {
+  font-size: clamp(0.95rem, 1.1vw, 1.35rem);
+  font-weight: 600;
+  color: var(--nc-cyan);
+  overflow-wrap: anywhere;
+}
+
+/* The picture and the clip fill the lane's width. The height is capped so a
+   tall picture cannot push the verdict off the bottom of the frame. */
+.media {
+  margin-top: clamp(0.5rem, 0.9vw, 1rem);
+  border: 2px solid var(--edge);
+  background: #0c0d0e;
+}
+
+.media img,
+.media video {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 46vh;
+  object-fit: contain;
+  background: #0c0d0e;
+}
+
+/* `auto` first, so the clip's own shape wins the moment the browser knows it.
+   The 16/9 behind it is only what holds the space open until then: without it
+   a video whose dimensions have not arrived yet collapses to the browser's
+   default 150 pixels, and the lane visibly jumps once the clip loads. */
+.media video {
+  aspect-ratio: auto 16 / 9;
+}
+
+/* The licence line under a clip. Inside the media box so it reads as part of
+   the clip rather than as page furniture, and sized to be read on the shot
+   rather than to be technically present: this is the LTX-2 Community
+   License's plain-disclosure obligation, and small print does not satisfy it. */
+.disclosure {
+  margin: 0;
+  padding: clamp(0.4rem, 0.6vw, 0.7rem) clamp(0.5rem, 0.7vw, 0.85rem);
+  border-top: 2px solid var(--edge);
+  font-size: clamp(0.85rem, 0.95vw, 1.15rem);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--nc-cream);
+  overflow-wrap: anywhere;
+}
+
+.answer {
+  margin: clamp(0.5rem, 0.9vw, 1rem) 0 0;
+  padding: clamp(0.6rem, 0.9vw, 1rem);
+  background: #0c0d0e;
+  border: 2px solid var(--edge);
+  border-left: 5px solid var(--nc-olive);
+  font-family: var(--font-mono);
+  font-size: clamp(0.9rem, 1.05vw, 1.25rem);
+  line-height: 1.45;
+  color: var(--nc-cream);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 22em;
+  overflow-y: auto;
+}
+
+.failure {
+  margin-top: clamp(0.5rem, 0.9vw, 1rem);
+  border: 2px solid var(--nc-red);
+  padding: clamp(0.6rem, 0.9vw, 1rem);
+}
+
+.failure-reason {
+  margin: 0;
+  font-size: clamp(1rem, 1.25vw, 1.5rem);
+  font-weight: 700;
+  color: var(--nc-red);
+  overflow-wrap: anywhere;
+}
+
+.failure-lines {
+  margin: 0.5em 0 0;
+  font-family: var(--font-mono);
+  font-size: clamp(0.85rem, 0.95vw, 1.1rem);
+  line-height: 1.45;
+  color: var(--nc-cream);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 12em;
+  overflow-y: auto;
+}
+
+.failure-lines:empty {
+  display: none;
+}
+
+/* ---------------------------------------------------------------- scoreboard */
+
+.scoreboard {
+  background: var(--nc-cream);
+  color: var(--nc-black);
+  border: 2px solid var(--nc-cream);
+  padding: clamp(1rem, 1.5vw, 1.75rem) clamp(1.25rem, 1.8vw, 2rem);
+}
+
+.scoreboard h2 {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.1rem, 1.5vw, 1.8rem);
+  letter-spacing: 0.14em;
+  margin: 0 0 0.4em;
+  color: var(--nc-black);
+}
+
+.verdict-text {
+  margin: 0;
+  font-size: clamp(1.2rem, 2vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--nc-black);
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- log */
+
+.logbar {
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  padding: clamp(0.6rem, 0.9vw, 1rem) clamp(1rem, 1.6vw, 1.75rem);
+}
+
+.logbar h2 {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(0.8rem, 0.95vw, 1.15rem);
+  letter-spacing: 0.14em;
+  margin: 0 0 0.4em;
+  color: var(--nc-cream);
+}
+
+/* Newest line first, so the line that just arrived is always in the same place
+   on screen. The font-size lives here, not on the li, so the em-based height
+   resolves against the size the lines are actually drawn at. */
+.log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: clamp(0.95rem, 1.05vw, 1.2rem);
+  line-height: 1.45;
+  max-height: calc(4 * 1.45em);
+  overflow-y: auto;
+}
+
+.log li {
+  font-weight: 500;
+  color: var(--nc-cream);
+  overflow-wrap: anywhere;
+}
+
+.log li.bad {
+  color: var(--nc-red);
+  font-weight: 700;
+}
+
+.log li.good {
+  color: var(--nc-cyan);
+}
+
+/* ---------------------------------------------------------------- narrow */
+
+@media (max-width: 900px) {
+  .lanes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .brand {
+    margin-right: 0;
+  }
+
+  .bar {
+    justify-content: space-between;
+  }
+}

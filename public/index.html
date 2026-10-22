@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM-Super-Bench</title>
+    <!-- Empty favicon: stops the browser making the one request we did not ask for. -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <h1>LLM-SUPER-BENCH</h1>
+      </div>
+
+      <div class="control">
+        <span class="control-name" id="machines-name">MACHINES</span>
+        <div class="choices" id="machines" role="group" aria-labelledby="machines-name"></div>
+      </div>
+
+      <div class="control">
+        <span class="control-name" id="presets-name">PROMPT SIZE</span>
+        <div class="choices" id="presets" role="group" aria-labelledby="presets-name"></div>
+        <p class="control-note" id="presets-note" aria-live="polite"></p>
+      </div>
+
+      <div class="control">
+        <span class="control-name" id="streams-name">STREAMS PER MACHINE</span>
+        <div class="choices" id="streams" role="group" aria-labelledby="streams-name"></div>
+        <p class="control-note" id="streams-note" aria-live="polite"></p>
+      </div>
+
+      <button class="start" id="start" type="button">START</button>
+      <!-- Shown only while a race or sweep is running. Cuts every request off at once. -->
+      <button class="start stop" id="stop" type="button" hidden>STOP</button>
+    </header>
+
+    <!-- Which machines are tested. Add, rename, change an address or remove one; each address is asked as soon as it is typed. -->
+    <details class="sweep" id="editor-panel">
+      <summary>MANAGE MACHINES: ADD, CHANGE OR REMOVE WHAT IS TESTED</summary>
+      <div class="sweep-body">
+        <p class="control-note" id="editor-hint"></p>
+        <div class="editor-rows" id="editor-rows"></div>
+        <div class="sweep-actions">
+          <button class="start secondary" id="editor-add" type="button">ADD MACHINE</button>
+          <button class="start" id="editor-save" type="button">SAVE AND USE</button>
+        </div>
+        <p class="control-note" id="editor-status" aria-live="polite"></p>
+      </div>
+    </details>
+
+    <!-- What each selected machine says about itself, and where they differ. Filled when opened. -->
+    <details class="sweep machines-panel" id="machines-panel">
+      <summary>MACHINE DETAILS: WHAT EACH MACHINE REPORTS</summary>
+      <div class="sweep-body">
+        <div class="machine-cards" id="machine-cards"></div>
+        <ul class="notes" id="machine-diffs"></ul>
+        <p class="control-note" id="machine-hint"></p>
+      </div>
+    </details>
+
+    <!-- Runs a grid of races (sizes x stream counts, each repeated) on the machines picked above, and tabulates the medians. -->
+    <details class="sweep" id="sweep">
+      <summary>SWEEP: RUN MANY RACES AND GET A TABLE</summary>
+      <div class="sweep-body">
+        <div class="control">
+          <span class="control-name" id="sweep-sizes-name">PROMPT SIZES</span>
+          <div class="choices" id="sweep-sizes" role="group" aria-labelledby="sweep-sizes-name"></div>
+        </div>
+        <div class="control">
+          <span class="control-name" id="sweep-streams-name">STREAMS PER MACHINE</span>
+          <div class="choices" id="sweep-streams" role="group" aria-labelledby="sweep-streams-name"></div>
+        </div>
+        <div class="control">
+          <span class="control-name" id="sweep-repeats-name">REPEATS (MEDIAN OF)</span>
+          <div class="choices" id="sweep-repeats" role="group" aria-labelledby="sweep-repeats-name"></div>
+        </div>
+        <p class="control-note" id="sweep-note"></p>
+        <div class="sweep-actions">
+          <button class="start" id="sweep-start" type="button">RUN SWEEP</button>
+          <button class="start secondary" id="sweep-csv" type="button" hidden>DOWNLOAD CSV</button>
+        </div>
+        <div class="sweep-table-wrap" id="sweep-table-wrap" hidden>
+          <table class="sweep-table">
+            <thead id="sweep-head"></thead>
+            <tbody id="sweep-rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </details>
+
+    <main>
+      <section class="lanes" id="lanes"></section>
+
+      <section class="scoreboard" id="scoreboard" hidden>
+        <h2 id="scoreboard-title">SCOREBOARD</h2>
+        <div class="verdicts" id="verdicts"></div>
+        <ul class="notes" id="notes"></ul>
+      </section>
+    </main>
+
+    <footer class="logbar">
+      <h2>RACE LOG</h2>
+      <ol class="log" id="log"></ol>
+    </footer>
+
+    <template id="lane-template">
+      <article class="lane">
+        <div class="lane-rule"></div>
+        <header class="lane-head">
+          <h2 class="lane-label"></h2>
+          <p class="lane-model"></p>
+        </header>
+
+        <div class="stats">
+          <div class="stat">
+            <span class="stat-name">FIRST WORD</span>
+            <span class="stat-value first-word">--</span>
+            <span class="stat-unit first-word-field"></span>
+          </div>
+          <div class="stat">
+            <span class="stat-name speed-name">SPEED</span>
+            <span class="stat-value rate">--</span>
+            <span class="stat-unit rate-unit">chunks/sec</span>
+          </div>
+          <!-- Only with more than one stream per machine: every stream together. -->
+          <div class="stat throughput-stat" hidden>
+            <span class="stat-name">ALL STREAMS</span>
+            <span class="stat-value throughput">--</span>
+            <span class="stat-unit throughput-unit"></span>
+          </div>
+        </div>
+
+        <div class="clockrow">
+          <span class="clock">0.00s</span>
+          <span class="lane-status">READY</span>
+        </div>
+
+        <div class="thinking" hidden>
+          <span class="thinking-name">THINKING</span>
+          <pre class="thinking-text"></pre>
+        </div>
+
+        <pre class="output" aria-live="off"></pre>
+        <p class="stream-note" hidden></p>
+        <p class="prompt-note" hidden></p>
+
+        <div class="totalrow">
+          <span class="total-name">TOTAL</span>
+          <span class="total-value">--</span>
+        </div>
+      </article>
+    </template>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

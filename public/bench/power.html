@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Power pass</title>
+    <!-- Empty favicon: stops the browser making the one request we did not ask for. -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/bench.css" />
+    <link rel="stylesheet" href="/power.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>POWER</h1>
+          <p class="subtitle" id="progress">starting…</p>
+        </div>
+      </div>
+      <div class="headline-stat">
+        <span class="value" id="lane">—</span>
+        <span class="name" id="lane-kind">lane</span>
+      </div>
+    </header>
+
+    <main class="stage">
+      <p class="action" id="action">Getting ready.</p>
+
+      <div class="countdown" id="countdown" hidden>
+        <span class="countdown-value" id="countdown-value">0</span>
+        <span class="countdown-name">seconds until the meter should be steady</span>
+      </div>
+
+      <form class="reading" id="reading-form" hidden>
+        <label class="reading-label" for="watts">Watts on the meter</label>
+        <div class="reading-row">
+          <input
+            class="reading-input"
+            id="watts"
+            type="number"
+            inputmode="decimal"
+            step="0.1"
+            min="0"
+            autocomplete="off"
+            placeholder="0"
+          />
+          <button class="reading-submit" type="submit">RECORD</button>
+          <button class="reading-skip" type="button" id="skip">SKIP</button>
+        </div>
+        <p class="reading-note">Typed in by hand off a wall meter. The board says so wherever it shows it.</p>
+      </form>
+    </main>
+
+    <footer class="panel">
+      <h2>Readings so far</h2>
+      <table class="readings" id="readings">
+        <thead>
+          <tr>
+            <th>Lane</th>
+            <th>Model</th>
+            <th>Reading</th>
+            <th>Watts</th>
+            <th>Held</th>
+          </tr>
+        </thead>
+        <tbody id="readings-body"></tbody>
+      </table>
+    </footer>
+
+    <script src="/power.js"></script>
+  </body>
+</html>

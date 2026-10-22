@@ -1,0 +1,25 @@
+# Real configs hold hostnames, IPs, machine labels and model paths. Never committed.
+race.config.json
+bench.config.json
+
+# Scratch tsconfig for a local typecheck against types that are not dependencies.
+tsconfig.check.json
+
+# The pids of the model servers `bun run lanes up` started.
+.lanes.json
+
+# Run logs
+results/
+
+# Prompt corpora the user drops in. The CC0 sample is the one exception.
+prompts/*
+!prompts/sample.txt
+
+node_modules/
+.DS_Store
+*.log
+
+# Python bytecode from the timing shim and its test stand-in.
+__pycache__/
+*.pyc
+!prompts/on-liberty-mill.txt

@@ -1,0 +1,138 @@
+THE PATIENT MACHINE
+An original essay written for this repository and dedicated to the public domain (CC0 1.0).
+Replace this file, or drop your own text beside it and point race.config.json at that instead.
+
+I.
+
+A computer is a patient machine. It will do the same small thing several billion times in a
+second and never once wonder why. That patience is the whole trick. Nothing a computer does is
+clever in the way a person is clever; the cleverness lives in the arrangement, in the order we
+put the small things in, and in the sheer willingness of the machine to keep going long after
+any person would have stopped to ask what the point was.
+
+The first people to build these machines understood this better than we sometimes do. They were
+not trying to make a mind. They were trying to make an arithmetic that did not get tired. A
+person adding a column of figures makes roughly one mistake in every few hundred lines, and the
+mistakes are not random: they cluster around the end of the afternoon, around interruptions,
+around the moment the adder starts thinking about dinner. A machine that adds has none of those
+failure modes. It has others, and they are strange ones, but they are not those.
+
+So the bargain was struck early. We would give up intuition and get back consistency. We would
+give up the ability to notice that a number looked wrong, and get back the ability to handle
+more numbers than any person could look at. Every argument about computers since has been an
+argument about that bargain and where its edges are.
+
+II.
+
+Consider how a signal travels. You press a key. A small spring closes a small circuit. Somewhere
+a controller notices the change, and because it was already looking, it notices within a few
+thousandths of a second. It writes a number into a place set aside for such numbers. A program,
+which has been waiting, finds the number, decides it means the letter you meant, and hands it on.
+By the time the letter appears on the screen, the signal has passed through perhaps a dozen
+translations, each one faithful, none of them aware of the others.
+
+This is the part that people find hardest to believe: there is no one in charge. There is no
+small clerk inside the machine who understands that you are writing a letter to your sister. There
+are only layers, each of which knows how to speak to the layer above it and the layer below it,
+and none of which knows the purpose of the whole. The purpose lives outside the machine. It lives
+in you.
+
+Networks work the same way, only the distances are longer and the faith required is greater. A
+message leaves your house in pieces. Each piece carries an address and very little else. No piece
+knows the route it will take. Routers along the way make a fresh decision for each one, based on
+what they knew a moment ago about which direction was good, and their knowledge is always slightly
+out of date. Pieces arrive out of order. Some do not arrive at all. At the far end, a program
+sorts them back into sequence, asks politely for the missing ones, and presents the result as if
+it had travelled in one calm piece, which it never did.
+
+The remarkable thing is not that this occasionally fails. The remarkable thing is that it works at
+all, continuously, for billions of people, on equipment made by companies that do not speak to one
+another, running software written decades apart. It works because the agreements are simple enough
+to be implemented correctly by people who never meet, and because every layer is willing to be
+ignorant of every other.
+
+III.
+
+Speed is the subject people most enjoy arguing about, and the subject about which they are most
+often confidently wrong. Here is the difficulty. A machine's speed is not one number. It is at
+least three, and they trade against one another.
+
+The first is latency: how long until anything happens at all. You press the key; how long until
+the letter appears. This is the number people feel. A system can do an enormous amount of work per
+second and still feel slow, because the first thing it does, it does late. Latency is dominated by
+the things that must happen in sequence, one after another, with no way to overlap them: a
+round trip across a continent, a disk head moving, a model reading an entire question before it
+may begin its answer.
+
+The second is throughput: how much gets done once things are moving. Throughput is where parallelism
+lives. If a task can be cut into pieces that do not depend on one another, throughput can be bought
+almost with money — add more workers, get more done. Latency cannot be bought this way. Nine women
+cannot produce a baby in one month, as the old line has it, and a thousand processors cannot shorten
+a chain of a thousand steps that each depend on the last.
+
+The third is consistency: how much the first two vary. A system that answers in one second every
+time is, for most human purposes, better than one that usually answers in a tenth of a second and
+occasionally takes thirty. People plan around the worst case they have experienced, not the average
+they were promised. This is why the honest way to describe a system's speed is to give a
+distribution, or at the very least a median and a bad case, rather than a single triumphant number
+from the best run of the afternoon.
+
+Almost every misleading performance claim comes from quoting one of these three and implying the
+others. A benchmark that measures throughput on a warm cache and reports it as responsiveness is
+not lying about any particular number. It is lying about which number matters.
+
+IV.
+
+Memory is the quiet constraint behind all of it. A processor can only work on what is close to
+hand, and "close" is a physical fact, not a metaphor: electricity takes time to cross a board, and
+at these speeds the time is significant. So machines are built as a series of shrinking rooms. A
+few values sit in registers, immediately available. A few thousand sit in a cache that can be read
+in a handful of cycles. A few billion sit in main memory, reachable in a few hundred. Beyond that
+lies storage, which is another world entirely, slower by a factor that used to be a hundred
+thousand and is now merely a thousand.
+
+Most of the art of making software fast is really the art of arranging for the next thing you need
+to already be in a small room. Programs that respect this are often dull to read: loops that walk
+straight through memory in order, data laid out in flat blocks, few pointers to chase. Programs
+that ignore it can be beautiful on the page and hopeless in practice, wandering from room to room,
+spending all their time walking and none of it working.
+
+This is also why the size of a problem changes its character. A thing that fits in cache and a
+thing that does not are not the same thing made bigger; they are different things. The methods that
+win at one scale lose at another. Anyone who has watched a tidy algorithm fall apart when the input
+grew by a factor of ten has met this fact in person.
+
+V.
+
+And then there is the part that is not technical at all.
+
+Every machine is built by people, and it carries their decisions in its bones long after they have
+gone. The reason a particular file format has a strange field in it, the reason a protocol reserves
+a byte nobody uses, the reason a system will not accept a name longer than a certain length: these
+are fossils. Each one was a reasonable judgement on a Tuesday, made by somebody who expected to
+revisit it and never did. To read an old system closely is to read a record of other people's
+Tuesdays.
+
+This is not a complaint. It is the condition of building anything that lasts. The alternative to
+carrying old decisions is breaking everything that depends on them, and everything depends on them.
+So we build forward, adding rooms to houses whose foundations we did not pour, and we try to leave
+our own decisions in a state where the next person can understand what we were thinking.
+
+The best engineers I have known are distinguished not by knowing more facts but by holding a better
+model of where they are ignorant. They know which part of the system they understand, which part
+they have merely used successfully, and which part they are simply trusting. When something breaks,
+they look first at the boundary between those regions, because that is nearly always where it
+broke.
+
+VI.
+
+What should a person take from all this?
+
+Perhaps only that the machine is not magic, and that its lack of magic is what makes it useful. It
+does small things faithfully. It does them in an order somebody chose. Its speed has three faces
+that must be named separately or not at all. Its memory is a set of shrinking rooms. Its history is
+a pile of other people's Tuesdays, and its behaviour at the edges is where its truth lives.
+
+None of this requires a talent for mathematics to understand. It requires only the willingness to
+ask, at every layer, what exactly is happening, and to keep asking after the first satisfying
+answer. The machine will wait. It is patient. That was always the point.

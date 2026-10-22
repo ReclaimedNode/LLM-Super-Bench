@@ -1,0 +1,26 @@
+{
+  "name": "llm-super-bench",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Race the same prompt across local OpenAI-compatible model servers, side by side, with honest timing \u2014 and benchmark a whole grid of prompt sizes across machines, with a results board.",
+  "scripts": {
+    "race": "bun run src/server.ts",
+    "lanes": "bun run src/lanescli.ts",
+    "mock": "bun run src/mock.ts",
+    "report": "bun run src/report.ts",
+    "bench": "bun run src/bench/cli.ts",
+    "board": "bun run src/bench/boardserver.ts",
+    "merge-runs": "bun run src/bench/mergecli.ts",
+    "power": "bun run src/bench/power.ts",
+    "setup-lane": "bun run src/bench/setupcli.ts",
+    "imagebench": "bun run src/bench/imagecli.ts",
+    "draw": "bun run src/bench/drawcli.ts",
+    "videobench": "bun run src/bench/videocli.ts",
+    "clip": "bun run src/bench/clipcli.ts",
+    "daily": "bun run src/bench/dailycli.ts",
+    "show": "bun run src/show/server.ts",
+    "test": "bun test",
+    "init": "bun run src/init.ts"
+  }
+}

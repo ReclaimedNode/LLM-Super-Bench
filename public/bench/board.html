@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Benchmark results</title>
+    <!-- Empty favicon: stops the browser making the one request we did not ask for. -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/bench.css" />
+    <link rel="stylesheet" href="/board.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>RESULTS</h1>
+          <p class="subtitle" id="run-name">loading…</p>
+        </div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </header>
+
+    <ul class="warnings" id="warnings" hidden></ul>
+
+    <main id="models"></main>
+
+    <footer class="panel footer" id="footer"></footer>
+
+    <script type="module" src="/board.js"></script>
+  </body>
+</html>

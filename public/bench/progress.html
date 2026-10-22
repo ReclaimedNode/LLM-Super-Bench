@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Benchmark running</title>
+    <!-- Empty favicon: stops the browser making the one request we did not ask for. -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/bench.css" />
+    <link rel="stylesheet" href="/progress.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <div>
+          <h1>BENCHMARK</h1>
+          <p class="subtitle" id="run-name">starting…</p>
+        </div>
+      </div>
+
+      <div class="headline-stat">
+        <span class="value" id="cells-done">0 / 0</span>
+        <span class="name">cells done</span>
+      </div>
+      <div class="headline-stat">
+        <span class="value" id="elapsed">0s</span>
+        <span class="name">elapsed</span>
+      </div>
+      <div class="headline-stat">
+        <span class="value" id="remaining">—</span>
+        <span class="name">left, roughly</span>
+      </div>
+    </header>
+
+    <p class="action-bar" id="action-bar" hidden></p>
+
+    <main class="lane-grid" id="lanes"></main>
+
+    <footer class="panel">
+      <h2>Log</h2>
+      <ol class="log" id="log"></ol>
+    </footer>
+
+    <template id="lane-template">
+      <section class="lane panel">
+        <div class="lane-rule"></div>
+        <header class="lane-head">
+          <h2 class="lane-label"></h2>
+          <span class="mark flat lane-kind"></span>
+          <span class="mark flat lane-phase"></span>
+        </header>
+
+        <p class="lane-model"></p>
+        <p class="lane-cell">—</p>
+
+        <div class="meters">
+          <div class="meter">
+            <span class="meter-name">Runs in this cell</span>
+            <span class="meter-value lane-runs">0 / 0</span>
+            <div class="bar-track"><div class="bar-fill lane-runs-bar"></div></div>
+          </div>
+          <div class="meter">
+            <span class="meter-name">Cells done</span>
+            <span class="meter-value lane-cells">0 / 0</span>
+            <div class="bar-track"><div class="bar-fill lane-cells-bar"></div></div>
+          </div>
+        </div>
+
+        <ol class="lane-recent"></ol>
+      </section>
+    </template>
+
+    <script src="/progress.js"></script>
+  </body>
+</html>

@@ -1,0 +1,706 @@
+/*
+  Broadcast graphics, not a web app. Rules that matter:
+    - it is filmed at 4K and watched on a phone, so numerals are enormous
+      and nothing that carries meaning is small or grey
+    - NetworkChuck palette: NC Orange, Rich Black, White Yellow, Light Cyan,
+      Olive Yellow, Gold, Red Orange
+    - local and system fonts only; the page makes zero network requests
+*/
+
+:root {
+  --nc-orange: #f1a21a;
+  --nc-black: #1e1f21;
+  --nc-cream: #f1efe4;
+  --nc-olive: #c2ba51;
+  --nc-cyan: #c0dcdf;
+  --nc-gold: #ca9f43;
+  --nc-red: #ca3b0f;
+
+  --bg: #121315;
+  --panel: #1e1f21;
+  --edge: #34363a;
+  --dim: #a9a79d;
+
+  /* Archivo and Inter if the machine has them; system stack otherwise.
+     Never a web font: that would be a network request. */
+  --font-head: "Archivo", "Archivo Black", "Helvetica Neue", -apple-system,
+    BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+    sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--nc-cream);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.2vw, 1.5rem);
+  padding: clamp(0.75rem, 1.2vw, 1.5rem);
+}
+
+/* ---------------------------------------------------------------- header */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: clamp(1rem, 2vw, 2.5rem);
+  flex-wrap: wrap;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  padding: clamp(0.75rem, 1.2vw, 1.25rem) clamp(1rem, 1.6vw, 1.75rem);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-right: auto;
+}
+
+.brand-mark {
+  width: clamp(0.85rem, 1.1vw, 1.3rem);
+  height: clamp(2rem, 3vw, 3.25rem);
+  background: var(--nc-orange);
+  flex: none;
+}
+
+h1 {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.6rem, 2.8vw, 3.25rem);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  margin: 0;
+  color: var(--nc-cream);
+}
+
+/* One labelled row of choices: which machines, how big a prompt, how many streams. */
+.control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.control-name {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(0.7rem, 0.85vw, 1rem);
+  letter-spacing: 0.12em;
+  color: var(--nc-cream);
+}
+
+/* The sweep panel: pick a grid, run it, read the table. */
+.sweep {
+  margin: 0 clamp(1rem, 2vw, 3rem);
+  border: 2px solid var(--edge);
+  color: var(--nc-cream);
+}
+
+.sweep summary {
+  cursor: pointer;
+  padding: 0.7em 1em;
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-size: clamp(0.8rem, 1vw, 1.1rem);
+}
+
+.sweep-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 0.5rem 1em 1.2em;
+}
+
+.sweep-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.sweep-table-wrap {
+  overflow-x: auto;
+}
+
+.sweep-table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: clamp(0.7rem, 0.9vw, 1rem);
+}
+
+.sweep-table th,
+.sweep-table td {
+  text-align: left;
+  padding: 0.4em 0.8em;
+  border-bottom: 1px solid var(--edge);
+  white-space: nowrap;
+}
+
+.sweep-table th {
+  font-family: var(--font-head);
+  letter-spacing: 0.08em;
+}
+
+/* The prompt-processing line under a finished lane. */
+.prompt-note {
+  margin: 0.4rem 0 0;
+  font-size: clamp(0.65rem, 0.8vw, 0.9rem);
+  color: var(--nc-cream);
+  opacity: 0.8;
+}
+
+.prompt-note[hidden] {
+  display: none;
+}
+
+/* What the machines said they can run at once. Empty until they have answered. */
+.control-note {
+  margin: 0;
+  max-width: 34rem;
+  font-size: clamp(0.65rem, 0.75vw, 0.85rem);
+  line-height: 1.35;
+  color: var(--nc-cream);
+  opacity: 0.75;
+}
+
+.control-note:empty {
+  display: none;
+}
+
+.choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.choices button {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(1rem, 1.35vw, 1.6rem);
+  letter-spacing: 0.04em;
+  color: var(--nc-cream);
+  background: transparent;
+  border: 2px solid var(--edge);
+  padding: 0.5em 1em;
+  cursor: pointer;
+  line-height: 1;
+}
+
+/* A prompt size a machine's reported context looks too small for. A warning, not a block. */
+.choices button.tight {
+  border-style: dashed;
+  border-color: var(--nc-gold);
+}
+
+.choices button:hover:not(:disabled) {
+  border-color: var(--nc-gold);
+}
+
+.choices button[aria-pressed="true"] {
+  background: var(--nc-cream);
+  border-color: var(--nc-cream);
+  color: var(--nc-black);
+}
+
+.choices button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.start {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.25rem, 2vw, 2.4rem);
+  letter-spacing: 0.06em;
+  color: var(--nc-black);
+  background: var(--nc-orange);
+  border: none;
+  padding: 0.45em 1.4em;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.start:hover:not(:disabled) {
+  background: var(--nc-gold);
+}
+
+.start:disabled {
+  background: var(--edge);
+  color: var(--dim);
+  cursor: default;
+}
+
+/* ---------------------------------------------------------------- lanes */
+
+main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.75rem, 1.2vw, 1.5rem);
+  min-height: 0;
+}
+
+.lanes {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(var(--lane-count, 2), minmax(0, 1fr));
+  gap: clamp(0.75rem, 1.2vw, 1.5rem);
+  min-height: 0;
+}
+
+.lane {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  padding: 0 clamp(1rem, 1.6vw, 1.75rem) clamp(1rem, 1.4vw, 1.5rem);
+}
+
+/* A lane the race is sitting out is not drawn at all, so the lanes left share the row. */
+.lane[hidden] {
+  display: none;
+}
+
+.lane-rule {
+  height: clamp(0.5rem, 0.65vw, 0.8rem);
+  background: var(--lane-color, var(--nc-orange));
+  margin: 0 clamp(-1.75rem, -1.6vw, -1rem);
+}
+
+.lane-head {
+  padding-top: clamp(0.75rem, 1.1vw, 1.25rem);
+}
+
+.lane-label {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.8rem, 3.2vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  color: var(--lane-color, var(--nc-orange));
+  overflow-wrap: anywhere;
+}
+
+.lane-model {
+  font-size: clamp(0.95rem, 1.15vw, 1.5rem);
+  font-weight: 600;
+  color: var(--nc-cream);
+  margin: 0.35em 0 0;
+  overflow-wrap: anywhere;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: clamp(0.5rem, 1vw, 1.25rem);
+  margin-top: clamp(0.75rem, 1.2vw, 1.4rem);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.stat[hidden] {
+  display: none;
+}
+
+/* Three numbers in a lane instead of two: smaller numerals so they still fit. */
+.stats.three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.stats.three .stat-value {
+  font-size: clamp(1.8rem, 3.4vw, 4.5rem);
+}
+
+.stat-name,
+.total-name,
+.thinking-name,
+.lane-status {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(0.8rem, 0.95vw, 1.15rem);
+  letter-spacing: 0.12em;
+  color: var(--nc-cream);
+}
+
+.stat-value {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2.4rem, 5vw, 6.5rem);
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  color: var(--nc-cream);
+}
+
+.stat-value.lit {
+  color: var(--lane-color, var(--nc-orange));
+}
+
+.stat-unit {
+  font-size: clamp(0.85rem, 1vw, 1.2rem);
+  font-weight: 600;
+  color: var(--nc-cream);
+  min-height: 1.4em;
+}
+
+.clockrow,
+.totalrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: clamp(0.5rem, 0.9vw, 1rem);
+}
+
+.clock {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.4rem, 2.2vw, 2.8rem);
+  line-height: 1;
+  color: var(--nc-cream);
+}
+
+.lane-status {
+  letter-spacing: 0.1em;
+}
+
+.lane-status.running {
+  color: var(--nc-orange);
+}
+
+.lane-status.done {
+  color: var(--nc-cyan);
+}
+
+.lane-status.failed {
+  color: var(--nc-red);
+}
+
+.thinking {
+  margin-top: clamp(0.5rem, 0.8vw, 0.9rem);
+  border-left: 4px solid var(--nc-olive);
+  padding-left: 0.75rem;
+}
+
+.thinking-text {
+  font-family: var(--font-mono);
+  font-size: clamp(0.85rem, 0.95vw, 1.1rem);
+  line-height: 1.45;
+  color: var(--nc-olive);
+  margin: 0.25em 0 0;
+  max-height: 6em;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.output {
+  flex: 1;
+  min-height: clamp(7rem, 16vh, 18rem);
+  margin: clamp(0.5rem, 0.9vw, 1rem) 0 0;
+  padding: clamp(0.6rem, 0.9vw, 1rem);
+  background: #0c0d0e;
+  border: 2px solid var(--edge);
+  font-family: var(--font-mono);
+  font-size: clamp(0.95rem, 1.1vw, 1.35rem);
+  line-height: 1.5;
+  color: var(--nc-cream);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  overflow-y: auto;
+}
+
+.output.failed {
+  color: var(--nc-red);
+  border-color: var(--nc-red);
+  font-weight: 600;
+}
+
+.stream-note {
+  margin: 0.4em 0 0;
+  font-size: clamp(0.85rem, 1vw, 1.2rem);
+  font-weight: 600;
+  color: var(--nc-cream);
+}
+
+.stream-note[hidden] {
+  display: none;
+}
+
+.total-value {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(1.6rem, 2.6vw, 3.25rem);
+  line-height: 1;
+  color: var(--nc-cream);
+}
+
+/* ---------------------------------------------------------------- scoreboard */
+
+.scoreboard {
+  background: var(--nc-cream);
+  color: var(--nc-black);
+  border: 2px solid var(--nc-cream);
+  padding: clamp(1rem, 1.5vw, 1.75rem) clamp(1.25rem, 1.8vw, 2rem);
+}
+
+.scoreboard h2 {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(1.1rem, 1.5vw, 1.8rem);
+  letter-spacing: 0.14em;
+  margin: 0 0 0.6em;
+  color: var(--nc-black);
+}
+
+.verdicts {
+  display: grid;
+  gap: clamp(0.5rem, 0.9vw, 1rem);
+}
+
+.verdict {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(0.75rem, 1.4vw, 1.75rem);
+  flex-wrap: wrap;
+}
+
+.verdict-measure {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-size: clamp(0.85rem, 1vw, 1.2rem);
+  letter-spacing: 0.12em;
+  color: #6b6a63;
+  min-width: 9ch;
+}
+
+.verdict-ratio {
+  font-family: var(--font-head);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(2rem, 3.6vw, 4.5rem);
+  line-height: 1;
+  color: var(--nc-red);
+}
+
+.verdict-text {
+  font-size: clamp(1.05rem, 1.4vw, 1.9rem);
+  font-weight: 600;
+  line-height: 1.3;
+  flex: 1;
+  min-width: 14rem;
+  overflow-wrap: anywhere;
+}
+
+.notes {
+  list-style: none;
+  margin: clamp(0.75rem, 1.1vw, 1.25rem) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.35em;
+}
+
+/* These notes carry the caveats that keep the numbers honest, so they are
+   sized and contrasted to be read, not skimmed past. */
+.notes li {
+  font-size: clamp(1.05rem, 1.25vw, 1.6rem);
+  font-weight: 600;
+  color: #2f2e2a;
+  border-left: 5px solid var(--nc-red);
+  padding-left: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- log */
+
+.logbar {
+  background: var(--panel);
+  border: 2px solid var(--edge);
+  padding: clamp(0.6rem, 0.9vw, 1rem) clamp(1rem, 1.6vw, 1.75rem);
+}
+
+.logbar h2 {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(0.8rem, 0.95vw, 1.15rem);
+  letter-spacing: 0.14em;
+  margin: 0 0 0.4em;
+  color: var(--nc-cream);
+}
+
+/* Newest line first, so the line that just arrived is always in the same place
+   on screen. No auto-scrolling to chase. */
+/* The font-size lives here, not on the li, so the em-based height below
+   resolves against the same size the lines are actually drawn at. Without that
+   the box clips a half-line, which looks like a mistake on camera. */
+.log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: clamp(0.95rem, 1.05vw, 1.2rem);
+  line-height: 1.45;
+  max-height: calc(4 * 1.45em);
+  overflow-y: auto;
+}
+
+.log li {
+  font-weight: 500;
+  color: var(--nc-cream);
+  overflow-wrap: anywhere;
+}
+
+.log li.bad {
+  color: var(--nc-red);
+  font-weight: 700;
+}
+
+.log li.good {
+  color: var(--nc-cyan);
+}
+
+/* ---------------------------------------------------------------- narrow */
+
+@media (max-width: 900px) {
+  .lanes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .brand {
+    margin-right: 0;
+  }
+
+  .bar {
+    justify-content: space-between;
+  }
+}
+
+/* The machine editor: one row per machine. */
+.editor-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.editor-row {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) minmax(14rem, 2fr) minmax(10rem, 2fr) auto;
+  gap: 0.6rem;
+  align-items: start;
+}
+
+.editor-row input {
+  font: inherit;
+  font-size: clamp(0.8rem, 1vw, 1.1rem);
+  color: var(--nc-cream);
+  background: transparent;
+  border: 2px solid var(--edge);
+  padding: 0.5em 0.7em;
+  min-width: 0;
+}
+
+.editor-row input:focus {
+  outline: none;
+  border-color: var(--nc-gold);
+}
+
+.editor-row .row-status {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: clamp(0.65rem, 0.8vw, 0.9rem);
+  opacity: 0.85;
+}
+
+.editor-row .row-status.bad {
+  color: var(--nc-gold);
+  opacity: 1;
+}
+
+.editor-row .remove {
+  font-family: var(--font-head);
+  font-weight: 700;
+  color: var(--nc-cream);
+  background: transparent;
+  border: 2px solid var(--edge);
+  padding: 0.5em 0.9em;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .editor-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* One card per machine in the details panel. */
+.machine-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: 1rem;
+}
+
+.machine-card {
+  border: 2px solid var(--edge);
+  padding: 0.8em 1em;
+}
+
+.machine-card h3 {
+  margin: 0 0 0.5em;
+  font-family: var(--font-head);
+  letter-spacing: 0.08em;
+}
+
+.machine-card dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25em 1em;
+  margin: 0;
+  font-size: clamp(0.7rem, 0.9vw, 1rem);
+}
+
+.machine-card dt {
+  opacity: 0.7;
+}
+
+.machine-card dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.start.stop {
+  background: transparent;
+  color: var(--nc-gold);
+  border: 2px solid var(--nc-gold);
+}
+
+.start.stop[hidden] {
+  display: none;
+}
+
+/* After .start so it wins. */
+.start.secondary {
+  background: transparent;
+  color: var(--nc-cream);
+  border: 2px solid var(--nc-cream);
+}

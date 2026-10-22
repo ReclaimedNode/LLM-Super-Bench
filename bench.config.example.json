@@ -1,0 +1,66 @@
+{
+  "progressPort": 9600,
+  "boardPort": 9700,
+  "outputCap": 128,
+  "measuredRuns": 5,
+  "warmupRuns": 1,
+  "restSeconds": 30,
+  "temperature": 0,
+  "charsPerToken": 4,
+  "promptFile": "prompts/sample.txt",
+  "promptLengths": [
+    {
+      "label": "512",
+      "tokens": 512
+    },
+    {
+      "label": "4K",
+      "tokens": 4096
+    },
+    {
+      "label": "16K",
+      "tokens": 16384
+    },
+    {
+      "label": "32K",
+      "tokens": 32768
+    }
+  ],
+  "models": [
+    {
+      "name": "Mock model",
+      "dir": "Mock-model-4bit",
+      "hfRepo": "vendor/Mock-model-4bit",
+      "kind": "llm",
+      "approxGb": 8,
+      "quantization": "4-bit",
+      "fileSize": "0 GB",
+      "activeParams": "a mock, no real parameters"
+    }
+  ],
+  "lanes": [
+    {
+      "label": "Lane A",
+      "baseUrl": "http://localhost:9001"
+    },
+    {
+      "label": "Lane B",
+      "baseUrl": "http://localhost:9002"
+    }
+  ],
+  "torture": [
+    {
+      "lane": "Lane A",
+      "model": "~/bench-models/Mock-model-4bit",
+      "tokens": 100000,
+      "label": "100K"
+    }
+  ],
+  "disableThinking": true,
+  "engineBenchmark": true,
+  "engineTrials": 5,
+  "powerHoldSeconds": 60,
+  "requestTimeoutMs": 1800000,
+  "preflightTimeoutMs": 30000,
+  "serverStartTimeoutMs": 600000
+}

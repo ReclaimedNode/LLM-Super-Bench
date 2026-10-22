@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Runs LLM-Super-Bench at boot on the Mac Mini and restarts it if it dies.
+
+  Before installing, change the four things marked EDIT:
+    1. the path to bun   (run `which bun`; it is usually /opt/homebrew/bin/bun
+       or /Users/<you>/.bun/bin/bun)
+    2. WorkingDirectory  (the harness folder)
+    3. RACE_PASSWORD     (or delete that pair if the page stays on a trusted LAN)
+    4. UserName          (your own account, so the server does not run as root)
+
+  Install:
+    sudo cp deploy/com.reclaimednode.llmsuperbench.plist /Library/LaunchDaemons/
+    sudo chown root:wheel /Library/LaunchDaemons/com.reclaimednode.llmsuperbench.plist
+    sudo chmod 644 /Library/LaunchDaemons/com.reclaimednode.llmsuperbench.plist
+    sudo launchctl bootstrap system /Library/LaunchDaemons/com.reclaimednode.llmsuperbench.plist
+
+  Check it:   sudo launchctl print system/com.reclaimednode.llmsuperbench | head -20
+  Logs:       tail -f /tmp/llmsuperbench.out.log /tmp/llmsuperbench.err.log
+  Restart:    sudo launchctl kickstart -k system/com.reclaimednode.llmsuperbench
+  Remove:     sudo launchctl bootout system/com.reclaimednode.llmsuperbench
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.reclaimednode.llmsuperbench</string>
+
+  <key>ProgramArguments</key>
+  <array>
+    <!-- EDIT 1 -->
+    <string>/opt/homebrew/bin/bun</string>
+    <string>src/server.ts</string>
+  </array>
+
+  <!-- EDIT 2 -->
+  <!-- EDIT 4 -->
+  <key>UserName</key>
+  <string>CHANGEME</string>
+
+  <key>WorkingDirectory</key>
+  <string>/Users/CHANGEME/LLM-Super-Bench</string>
+
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    <!-- EDIT 3 -->
+    <key>RACE_PASSWORD</key>
+    <string>CHANGE-THIS</string>
+  </dict>
+
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+
+  <key>StandardOutPath</key>
+  <string>/tmp/llmsuperbench.out.log</string>
+  <key>StandardErrorPath</key>
+  <string>/tmp/llmsuperbench.err.log</string>
+</dict>
+</plist>

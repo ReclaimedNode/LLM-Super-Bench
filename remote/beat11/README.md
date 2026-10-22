@@ -1,0 +1,13 @@
+# Beat 11: a local AI edits a take in DaVinci Resolve (built 2026-09-21)
+
+Everything here ran on the M5 Ultra, beside DaVinci Resolve Studio 21.1 and the MCP server Resolve ships with. The model doing the editing is Qwen3.8 27B 4-bit. The test A rehearsal reached it through the Hermes agent, with the model on `mlx_lm.server` and Resolve's 14 MCP tools as the agent's only tools; the test B rehearsal ran in Bionic 1.1.5 (LM Studio's agent app), which runs the model on its own MLX engine and is connected to Resolve's MCP server. The footage is a 13.8-minute 4K camera take from an unreleased video. The take and its transcript are not in this repository, so these files are the method and the prompts, not a demo you can run as-is.
+
+- `resolve-editor-system-prompt.md` / `message-1.txt`: test A. The 27B gets the transcript and a tested Resolve recipe, and decides the cuts itself. `message-1.txt` is the same text plus "reply OK and wait", sent as the first chat message because Bionic 1.1.5 has no system-prompt box in the chat.
+- `resolve-editor-kev-prompt.md` / `message-1-kev.txt`: test B. Kev-4B judges every transcript segment; the 27B only runs start / wait / build.
+- `kevjudge.py`: the judge. `judge` (5 segments per call, cut threshold 0.35, restart detector), `start` (detached), `wait` (polls the progress file, returns inside the Resolve tool's 60 s cap), `rethreshold`, `ranges`. It talks to Kev's own local server (`python -m kev.serve --run jaredpalmer/kev-4b --port 8009`, from [github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev), Apache-2.0) at `/v1/systemone`. It lives at `~/bench-daily/kevjudge.py` on the machine. Every recipe step does `sys.modules.pop("kevjudge", None)` first because the Resolve MCP sandbox keeps modules loaded between calls.
+- `compare.py`: segment-level agreement between Kev's verdicts and the 27B's keep list.
+- `rmcp.py` / `probe-state.py`: talk to Resolve's own MCP server over stdio without a chat app (`python rmcp.py <script.py> [unsafe]`).
+
+The prompts are verbatim except for one thing: the machine's absolute home path is written as `/path/to/bench-daily`. The scripts use `~/bench-daily` through `os.path.expanduser`.
+
+Measured (rehearsals, 2026-09-21): test A, 5 tool calls, 828 s of take cut to 301 s, 30 kept ranges. Test B, 1 min 35 s end to end; Kev judged 143 segments in 29 calls in 67 s and cut 28 (15 by Kev, 13 by the restart detector); 13:48 in, 5:19 out, 51 kept ranges. The two cuts agree on 82% of segments. The numbers, with their sources, are in `data/everyday.json` and `data/resolve-edit/` at the top of this repository.

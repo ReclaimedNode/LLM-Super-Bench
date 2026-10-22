@@ -1,0 +1,22 @@
+{
+  "port": 9500,
+  "maxTokens": 512,
+  "temperature": 0,
+  "charsPerToken": 4,
+  "promptFile": "prompts/sample.txt",
+  "requestTimeoutMs": 180000,
+  "preflightTimeoutMs": 30000,
+  "maxConcurrency": 16,
+  "lanes": [
+    {
+      "label": "Lane A",
+      "baseUrl": "http://localhost:9001",
+      "model": "mock-model"
+    },
+    {
+      "label": "Lane B",
+      "baseUrl": "http://localhost:9002",
+      "model": "mock-model"
+    }
+  ]
+}

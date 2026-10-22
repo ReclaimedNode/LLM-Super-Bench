@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tests</title>
+    <!-- Empty favicon: stops the browser making the one request we did not ask for. -->
+    <link rel="icon" href="data:," />
+    <link rel="stylesheet" href="/show.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <div class="brand">
+        <span class="brand-mark"></span>
+        <h1>TESTS</h1>
+      </div>
+
+      <div class="presets" id="tests" role="group" aria-label="Test"></div>
+
+      <button class="start" id="start" type="button">START</button>
+    </header>
+
+    <section class="setup" id="setup">
+      <p class="about" id="about"></p>
+      <div class="setup-row">
+        <input
+          class="prompt"
+          id="prompt"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          aria-label="Prompt"
+          hidden
+        />
+        <div class="presets choices" id="sizes" role="group" aria-label="Size" hidden></div>
+        <div class="presets choices" id="models" role="group" aria-label="Model or starting point" hidden></div>
+      </div>
+    </section>
+
+    <main>
+      <section class="lanes" id="lanes"></section>
+
+      <section class="scoreboard" id="scoreboard" hidden>
+        <h2>SCOREBOARD</h2>
+        <p class="verdict-text" id="verdict"></p>
+      </section>
+    </main>
+
+    <footer class="logbar">
+      <h2>RESULTS LOG</h2>
+      <ol class="log" id="log"></ol>
+    </footer>
+
+    <template id="lane-template">
+      <article class="lane">
+        <div class="lane-rule"></div>
+        <header class="lane-head">
+          <h2 class="lane-label"></h2>
+        </header>
+
+        <!-- What this machine's chip is doing, live, whether or not a test is
+             running. The Neural Engine is spelled out because the camera has
+             to be able to read it: it sits at 0 W through every test here, and
+             that is the point being made. -->
+        <ul class="strip">
+          <li><span class="strip-key">GPU</span><span class="strip-value stat-gpu">--</span></li>
+          <li><span class="strip-key">GPU POWER</span><span class="strip-value stat-gpu-watts">--</span></li>
+          <li><span class="strip-key">CPU</span><span class="strip-value stat-cpu">--</span></li>
+          <li><span class="strip-key">RAM</span><span class="strip-value stat-ram">--</span></li>
+          <li><span class="strip-key">NEURAL ENGINE</span><span class="strip-value stat-ane">--</span></li>
+          <li><span class="strip-key">GPU TEMP</span><span class="strip-value stat-temp">--</span></li>
+        </ul>
+
+        <div class="clockrow">
+          <span class="clock">0.00s</span>
+          <span class="lane-status">READY</span>
+        </div>
+
+        <div class="result">
+          <span class="stat-value number">--</span>
+          <span class="stat-unit number-label"></span>
+          <ul class="extras"></ul>
+          <div class="media" hidden></div>
+          <pre class="answer" hidden></pre>
+          <div class="failure" hidden>
+            <p class="failure-reason"></p>
+            <pre class="failure-lines"></pre>
+          </div>
+        </div>
+      </article>
+    </template>
+
+    <script src="/show.js"></script>
+  </body>
+</html>
