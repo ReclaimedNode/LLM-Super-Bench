@@ -110,6 +110,11 @@ export function validateConfig(raw: unknown): RaceConfig {
     return v;
   };
 
+  const thinkingOf = (v: unknown): "auto" | "off" => {
+    if (v !== "auto" && v !== "off") fail('`thinking` must be "auto" or "off"');
+    return v as "auto" | "off";
+  };
+
   const promptFile = typeof obj.promptFile === "string" && obj.promptFile.trim() !== ""
     ? obj.promptFile
     : DEFAULTS.promptFile;
@@ -122,6 +127,7 @@ export function validateConfig(raw: unknown): RaceConfig {
   return {
     port: num("port", 1),
     maxTokens: num("maxTokens", 1),
+    ...(obj.thinking === undefined ? {} : { thinking: thinkingOf(obj.thinking) }),
     temperature: obj.temperature === undefined ? DEFAULTS.temperature : num("temperature", 0),
     charsPerToken: num("charsPerToken", 1),
     promptFile,

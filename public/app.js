@@ -17,6 +17,10 @@ const el = {
   presetsNote: document.getElementById("presets-note"),
   editorPanel: document.getElementById("editor-panel"),
   editorHint: document.getElementById("editor-hint"),
+  replyLength: document.getElementById("reply-length"),
+  replyNote: document.getElementById("reply-note"),
+  thinkingSwitch: document.getElementById("thinking-switch"),
+  thinkingNote: document.getElementById("thinking-note"),
   editorRows: document.getElementById("editor-rows"),
   editorSave: document.getElementById("editor-save"),
   editorStatus: document.getElementById("editor-status"),
@@ -53,6 +57,10 @@ let racing = false;
 let mode = "head";
 let selectedMachine = "all";
 let machineButtons = [];
+let replyButtons = [];
+let thinkingButtons = [];
+let currentThinking = "auto";
+let currentReply = 512;
 let configLanes = [];
 
 // Streams per machine, as chosen, and as the race that is on screen ran them.
@@ -74,7 +82,7 @@ let sweepStreamOptions = [1];
 
 function choiceButtons() {
   return [
-    ...machineButtons, ...presetButtons, ...streamButtons,
+    ...machineButtons, ...presetButtons, ...streamButtons, ...replyButtons, ...thinkingButtons,
     ...sweepSizeButtons, ...sweepStreamButtons, ...sweepRepeatButtons,
     ...(sweepWarmupButton ? [sweepWarmupButton] : []),
   ];
@@ -158,6 +166,8 @@ function resetLanes() {
     view.throughputUnit.textContent = "";
     view.clock.textContent = "0.00s";
     view.thinking.hidden = true;
+    view.sawThinking = false;
+    view.sawReply = false;
     view.thinkingText.textContent = "";
     view.output.textContent = "";
     view.output.classList.remove("failed");
@@ -412,6 +422,90 @@ function updateSweepNote() {
   el.sweepStart.disabled = racing || runs === 0 || runs > SWEEP_MAX_RUNS;
 }
 
+// ------------------------------------------------------------------ reply length and thinking
+
+function kLabel(n) {
+  return n >= 1024 && n % 1024 === 0 ? `${n / 1024}K` : String(n);
+}
+
+async function changeSetting(change) {
+  try {
+    const response = await postJson("/api/settings", change);
+    const answer = await response.json();
+    if (!response.ok) {
+      logLine(`Not changed. ${answer.error ?? "The server refused."}`, "bad");
+      return false;
+    }
+    currentReply = answer.maxTokens;
+    currentThinking = answer.thinking;
+    if (answer.saved === false) logLine("Changed until the server restarts. Save your machines once and it is kept.");
+    return true;
+  } catch (err) {
+    logLine(`Not changed. ${err.message}`, "bad");
+    return false;
+  }
+}
+
+function paintSettings() {
+  for (const b of replyButtons) b.setAttribute("aria-pressed", String(Number(b.dataset.tokens) === currentReply));
+  for (const b of thinkingButtons) b.setAttribute("aria-pressed", String(b.dataset.thinking === currentThinking));
+  el.replyNote.textContent = `Each machine may write up to ${currentReply.toLocaleString("en-US")} tokens.`;
+  el.thinkingNote.textContent = currentThinking === "off"
+    ? "Every machine is asked not to think. A model whose template ignores this still will."
+    : "The model is left as it is. A thinking model can use its whole reply thinking.";
+}
+
+function buildSettings(config) {
+  currentReply = config.maxTokens;
+  currentThinking = config.thinking ?? "auto";
+  const lengths = [...new Set([...(config.replyLengths ?? [512]), config.maxTokens])].sort((x, y) => x - y);
+  const mk = (parent, items) =>
+    items.map((item) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = item.label;
+      button.title = item.title;
+      if (!editable) {
+        button.title = "Changing this needs a password (start the server with RACE_PASSWORD).";
+      }
+      button.addEventListener("click", async () => {
+        if (racing || !editable) return;
+        if (await changeSetting(item.change)) {
+          paintSettings();
+          refreshCapacity();
+        }
+      });
+      button.dataset.tokens = item.tokens ?? "";
+      button.dataset.thinking = item.thinking ?? "";
+      parent.append(button);
+      return button;
+    });
+  el.replyLength.textContent = "";
+  el.thinkingSwitch.textContent = "";
+  replyButtons = mk(el.replyLength, lengths.map((n) => ({
+    label: kLabel(n), title: `Each machine may write up to ${n} tokens`, tokens: n, change: { maxTokens: n },
+  })));
+  thinkingButtons = mk(el.thinkingSwitch, [
+    { label: "AUTO", title: "leave the model as it is", thinking: "auto", change: { thinking: "auto" } },
+    { label: "OFF", title: "ask every machine not to think", thinking: "off", change: { thinking: "off" } },
+  ]);
+  paintSettings();
+}
+
+/** After a race: a machine that only ever thought used its whole reply doing it. Say so, with the way out. */
+function warnAboutThinking() {
+  const spent = [];
+  for (const [, view] of laneViews) {
+    if (view.sawThinking && !view.sawReply) spent.push(view.root.querySelector(".lane-label").textContent);
+  }
+  if (spent.length === 0) return;
+  logLine(
+    `${spent.join(" and ")} spent the whole reply thinking and never answered, so its speed is thinking speed. ` +
+      "Set THINKING to OFF, or pick a longer REPLY LENGTH, and run again.",
+    "bad",
+  );
+}
+
 // ------------------------------------------------------------------ machine editor
 
 let editable = false;
@@ -500,6 +594,12 @@ let editorSlots = [];
 let savedLanes = [];
 let editorLoadToken = 0;
 
+/** The streams-at-once box: empty clears it (the machine is asked), a number sets it. */
+function slotsOf(row) {
+  const text = row.slots.value.trim();
+  return text === "" ? null : Number(text);
+}
+
 function createSlot(lane, n) {
   const node = document.createElement("div");
   node.className = "editor-row";
@@ -518,12 +618,13 @@ function createSlot(lane, n) {
     name: field(`Machine ${n} name, e.g. Mac Studio`, lane?.label, `Machine ${n} name`),
     address: field("Address, e.g. http://192.168.1.50:8000", lane?.baseUrl, `Machine ${n} address`),
     notes: field("Notes: how it was started (optional)", lane?.notes, `Notes about how machine ${n} was started`),
+    slots: field("Streams at once (blank: ask the machine)", lane?.slots ?? "", `Streams machine ${n} runs at once`),
     status: document.createElement("p"),
   };
   row.status.className = "row-status";
   // Asked as soon as the address is entered, not when saving.
   row.address.addEventListener("change", () => checkRow(row));
-  node.append(row.name, row.address, row.notes, row.status);
+  node.append(row.name, row.address, row.notes, row.slots, row.status);
   el.editorRows.append(node);
   return row;
 }
@@ -578,6 +679,7 @@ async function saveEditor() {
     label: r.name.value.trim(),
     baseUrl: r.address.value.trim(),
     notes: r.notes.value.trim(),
+    slots: slotsOf(r),
   }));
   // Solo changes the first machine only. A machine already saved for head to head is kept only if it
   // still answers, so a leftover that is switched off can never block saving the one machine.
@@ -585,7 +687,7 @@ async function saveEditor() {
     savedLanes.slice(1).forEach((l, i) => {
       const row = editorSlots[i + 1];
       if (row && row.status.textContent.startsWith("Answered")) {
-        lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "" });
+        lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", slots: l.slots ?? null });
       }
     });
   }
@@ -806,10 +908,12 @@ function onEvent(event) {
       const view = laneViews.get(event.laneId);
       if (!view) break;
       if (event.field === "content") {
+        view.sawReply = true;
         view.output.append(document.createTextNode(event.text));
         view.output.scrollTop = view.output.scrollHeight;
       } else {
         view.thinking.hidden = false;
+        view.sawThinking = true;
         view.thinkingText.append(document.createTextNode(event.text));
       }
       break;
@@ -878,6 +982,7 @@ function onEvent(event) {
 
     case "race-done":
       renderScoreboard(event.scoreboard);
+      warnAboutThinking();
       break;
 
     case "sweep-warmup":
@@ -1165,6 +1270,8 @@ async function boot() {
   mode = config.lanes.length >= 2 ? "head" : "solo";
   buildLanes(config.lanes);
   buildMachines(config.lanes);
+  editable = config.editable === true;
+  buildSettings(config);
   buildPresets(config.presets);
   buildSweepSizes(config.presets);
   buildSweepRepeats();

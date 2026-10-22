@@ -20,6 +20,7 @@ import type { LaneCapacity } from "./capacity.ts";
 import { runRace } from "./race.ts";
 import { parseRaceRequest } from "./request.ts";
 import { concurrencyOptions } from "./streams.ts";
+import { REPLY_LENGTHS, applySettings, parseSettings } from "./settings.ts";
 import { parseSweepRequest, runSweep } from "./sweep.ts";
 import type { SweepEvent } from "./sweep.ts";
 import type { RaceEvent } from "./types.ts";
@@ -176,6 +177,8 @@ const server = Bun.serve({
         // The streams-per-machine buttons. 1 is an ordinary race.
         concurrencyOptions: concurrencyOptions(maxConcurrency),
         maxTokens: config.maxTokens,
+        thinking: config.thinking ?? "auto",
+        replyLengths: REPLY_LENGTHS,
         charsPerToken: config.charsPerToken,
         promptFile: config.promptFile,
         usingExampleConfig: usedExample,
@@ -229,6 +232,26 @@ const server = Bun.serve({
       return Response.json({ ok: true });
     }
 
+    // ---- reply length and thinking, for every machine (needs the password)
+    if (url.pathname === "/api/settings" && req.method === "POST") {
+      if (password === "") {
+        return Response.json(
+          { error: "Changing settings from the page needs a password. Start the server with RACE_PASSWORD=... and reload." },
+          { status: 403 },
+        );
+      }
+      if (raceInFlight) {
+        return Response.json({ error: "A race is running. Change this after it finishes." }, { status: 409 });
+      }
+      const parsed = parseSettings(await req.json().catch(() => ({})));
+      if (!parsed.ok) return Response.json({ error: parsed.error }, { status: 400 });
+      // On the built-in example config nothing is written, so a settings click cannot create a config of mock machines.
+      const result = await applySettings({ config, change: parsed.change, writePath: usedExample ? undefined : CONFIG_PATH });
+      if (!result.ok) return Response.json({ error: result.error }, { status: 400 });
+      config = result.config;
+      return Response.json({ ok: true, maxTokens: config.maxTokens, thinking: config.thinking ?? "auto", saved: !usedExample });
+    }
+
     // ---- changing which machines are tested (needs the password)
     if (url.pathname.startsWith("/api/lanes")) {
       if (password === "") {
@@ -240,8 +263,8 @@ const server = Bun.serve({
 
       if (url.pathname === "/api/lanes-config" && req.method === "GET") {
         return Response.json({
-          lanes: config.lanes.map((l) => ({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "" })),
-          minMachines: 2,
+          lanes: config.lanes.map((l) => ({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", slots: l.slots ?? null })),
+          minMachines: 1,
           maxMachines: 4,
         });
       }

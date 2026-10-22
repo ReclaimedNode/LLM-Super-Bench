@@ -21,6 +21,8 @@ export interface MockLaneOptions {
   includeUsage: boolean;
   /** Emit a few `delta.reasoning` chunks before the reply, like a thinking model. */
   reasoningChunks?: number;
+  /** Send only the reasoning, as a thinking model does when its reply cap runs out before the answer. */
+  thinkOnly?: boolean;
   /**
    * Emit this many text-free chunks immediately, before firstWordDelayMs starts.
    * Real servers commonly open with `{"role":"assistant","content":""}`. A tool
@@ -186,7 +188,7 @@ export function startMockLane(options: MockLaneOptions): Server {
             }
 
             let sent = 0;
-            while (sent < maxChunks) {
+            while (!options.thinkOnly && sent < maxChunks) {
               const word = WORDS[sent % WORDS.length]!;
               send(chunkFrame(model, { content: sent === 0 ? word : ` ${word}` }, fingerprint));
               sent++;
@@ -256,6 +258,7 @@ if (import.meta.main) {
   const chunks = listArg(argv, "--chunks");
   const usage = listArg(argv, "--usage");
   const reasoning = listArg(argv, "--reasoning");
+  const thinkOnly = listArg(argv, "--think-only");
   const emptyLead = listArg(argv, "--empty-lead");
   const perKChar = listArg(argv, "--per-kchar");
   const cached = listArg(argv, "--cached");
@@ -283,6 +286,7 @@ if (import.meta.main) {
       chunks: pick(chunks, i, Number, 90),
       includeUsage: pick(usage, i, (s) => s === "true", false),
       reasoningChunks: pick(reasoning, i, Number, 0),
+      thinkOnly: pick(thinkOnly, i, (s) => s === "true", false),
       leadingEmptyChunks: pick(emptyLead, i, Number, 0),
       firstWordPerKCharMs: pick(perKChar, i, Number, 0),
       cachedTokens: pick(cached, i, Number, 0),

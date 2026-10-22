@@ -20,6 +20,8 @@ export interface EditedLane {
   label: string;
   baseUrl: string;
   notes?: string;
+  /** Streams the machine runs at once. A number sets it, null clears it (the machine is asked), absent keeps what was saved. */
+  slots?: number | null;
 }
 
 export const MIN_MACHINES = 1;
@@ -45,7 +47,16 @@ export function parseEditedLanes(body: unknown): { ok: true; lanes: EditedLane[]
     if (baseUrl === null) return { ok: false, error: `${label} needs an address like http://192.168.1.50:8000.` };
     const notes = typeof row.notes === "string" ? row.notes.trim() : "";
     if (notes.length > 300) return { ok: false, error: `${label}'s notes are longer than 300 characters.` };
-    lanes.push({ label, baseUrl, ...(notes ? { notes } : {}) });
+    let slots: number | null | undefined;
+    if (row.slots === null || row.slots === "") slots = null;
+    else if (row.slots !== undefined) {
+      const n = typeof row.slots === "string" ? Number(row.slots.trim()) : row.slots;
+      if (typeof n !== "number" || !Number.isInteger(n) || n < 1 || n > 256) {
+        return { ok: false, error: `${label}'s streams at once must be a whole number from 1 to 256, or empty to ask the machine.` };
+      }
+      slots = n;
+    }
+    lanes.push({ label, baseUrl, ...(notes ? { notes } : {}), ...(slots !== undefined ? { slots } : {}) });
   }
   return { ok: true, lanes };
 }
@@ -63,10 +74,11 @@ export function mergeLanes(existing: LaneConfig[], edited: EditedLane[], modelId
       // The short model name is only still right if it is the same model.
       if (before.model === modelId && before.displayModel) kept.displayModel = before.displayModel;
       if (before.apiKey) kept.apiKey = before.apiKey;
-      if (before.slots !== undefined) kept.slots = before.slots;
+      if (before.slots !== undefined && e.slots === undefined) kept.slots = before.slots;
       if (before.extraBody) kept.extraBody = before.extraBody;
     }
     if (kept.displayModel === "") delete kept.displayModel;
+    if (typeof e.slots === "number") kept.slots = e.slots;
     if (e.notes) kept.notes = e.notes;
     return kept;
   });

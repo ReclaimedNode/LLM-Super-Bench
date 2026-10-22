@@ -3,6 +3,7 @@
  * them stream. A lane that fails does not stop the others.
  */
 
+import { extraBodyFor } from "./settings.ts";
 import type { MachineSetup } from "./details.ts";
 import { appendRecords, toRecord } from "./log.ts";
 import type { Fetcher, LaneState } from "./lane.ts";
@@ -143,6 +144,7 @@ interface RunStreamsOptions {
   prompts: string[];
   states: LaneState[];
   maxTokens: number;
+  thinking?: "auto" | "off";
   temperature: number;
   timeoutMs: number;
   emit: (event: RaceEvent) => void;
@@ -171,8 +173,8 @@ async function runStreams(o: RunStreamsOptions): Promise<LaneResult> {
     timeoutMs: o.timeoutMs,
     fetchImpl: o.fetchImpl,
     now: o.now,
-    // Per-machine request fields from the config, e.g. turning thinking off.
-    extraBody: lane.extraBody,
+    // Per-machine request fields from the config, plus the page's thinking switch.
+    extraBody: extraBodyFor(lane, o.thinking),
     signal: o.signal,
   };
 
@@ -368,6 +370,7 @@ export async function runRace(opts: RunRaceOptions): Promise<RaceOutcome> {
           prompts: prompts.map((p) => p.text),
           states: groups.get(laneId)!,
           maxTokens: config.maxTokens,
+          thinking: config.thinking,
           temperature: config.temperature,
           timeoutMs: config.requestTimeoutMs,
           emit,
