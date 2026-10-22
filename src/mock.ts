@@ -58,6 +58,8 @@ export interface MockLaneOptions {
   modelPath?: string;
   /** build_info in /props. */
   build?: string;
+  /** Answer like vLLM: no /props or /slots, /v1/models with root and max_model_len, and /version. */
+  vllm?: { root: string; maxModelLen: number; version: string };
 }
 
 const WORDS = [
@@ -94,7 +96,17 @@ export function startMockLane(options: MockLaneOptions): Server {
     async fetch(req) {
       const url = new URL(req.url);
 
+      if (options.vllm && url.pathname === "/version") {
+        return Response.json({ version: options.vllm.version });
+      }
+
       if (url.pathname === "/v1/models") {
+        if (options.vllm) {
+          return Response.json({
+            object: "list",
+            data: [{ id: model, object: "model", created: 0, owned_by: "vllm", root: options.vllm.root, max_model_len: options.vllm.maxModelLen }],
+          });
+        }
         return Response.json({
           object: "list",
           data: [{ id: model, object: "model", created: 0, owned_by: "mock" }],
@@ -255,6 +267,8 @@ if (import.meta.main) {
   const slots = listArg(argv, "--slots");
   const modelPath = listArg(argv, "--model-path");
   const build = listArg(argv, "--build");
+  // "--vllm root,maxModelLen,version" makes that mock answer the way vLLM does.
+  const vllm = listArg(argv, "--vllm");
 
   // Defaults make lane 1 clearly slower than lane 0, so the scoreboard has
   // something to say the first time you press start.
@@ -277,6 +291,10 @@ if (import.meta.main) {
       slots: pick(slots, i, (s) => (Number(s) > 0 ? Number(s) : undefined), undefined),
       modelPath: pick(modelPath, i, (s) => s, undefined),
       build: pick(build, i, (s) => s, undefined),
+      vllm: pick(vllm, i, (s) => {
+        const [root, len, version] = s.split("|");
+        return { root: root ?? "", maxModelLen: Number(len) || 8192, version: version ?? "0.0.0" };
+      }, undefined),
     };
     startMockLane(opts);
     return opts;

@@ -64,7 +64,8 @@ export const EMPTY_SETUP: MachineSetup = {
   notes: null,
 };
 
-const QUANT = /(?:^|[-_.])((?:IQ|Q)\d(?:_[A-Z0-9]+)*|F16|F32|BF16)(?=[-_.]|$)/i;
+// GGUF names (Q8_0, F16 ...) and the usual vLLM ones (AWQ, GPTQ, FP8 ...).
+const QUANT = /(?:^|[-_.])((?:IQ|Q)\d(?:_[A-Z0-9]+)*|F16|F32|BF16|AWQ|GPTQ|NVFP4|MXFP4|FP8|FP4|INT4|INT8|W4A16|W8A8)(?=[-_.]|$)/i;
 
 export function quantOf(file: string | null): string | null {
   if (!file) return null;
@@ -100,6 +101,22 @@ async function getJson(lane: LaneConfig, path: string, timeoutMs: number, fetchI
   }
 }
 
+async function getText(lane: LaneConfig, path: string, timeoutMs: number, fetchImpl: Fetcher): Promise<string | null> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const headers: Record<string, string> = {};
+    if (lane.apiKey) headers.Authorization = `Bearer ${lane.apiKey}`;
+    const response = await fetchImpl(`${lane.baseUrl}${path}`, { headers, signal: controller.signal });
+    if (!response.ok) return null;
+    return (await response.text()).slice(0, 2_000_000);
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export interface DetailsOptions {
   timeoutMs?: number;
   fetchImpl?: Fetcher;
@@ -109,7 +126,14 @@ export interface DetailsOptions {
 export function readDetails(
   lane: Pick<LaneConfig, "label" | "slots" | "notes">,
   laneId: string,
-  answers: { props: unknown | null; slots: unknown | null; models: unknown | null },
+  answers: {
+    props: unknown | null;
+    slots: unknown | null;
+    models: unknown | null;
+    /** vLLM's GET /version, and the text of its GET /metrics. Both optional. */
+    version?: unknown | null;
+    metrics?: string | null;
+  },
 ): MachineDetails {
   const props = obj(answers.props);
   const capacity: LaneCapacity = lane.slots !== undefined
@@ -118,8 +142,18 @@ export function readDetails(
       ? UNKNOWN_CAPACITY
       : readProps(answers.props);
 
-  const modelPath = str(props?.model_path);
+  const first = Array.isArray(obj(answers.models)?.data) ? obj((obj(answers.models)!.data as unknown[])[0]) : null;
+  const meta = obj(first?.meta);
+
+  // vLLM has no /props. It lists the model's real path or Hugging Face name as `root`, and the longest
+  // request it accepts as `max_model_len`, and it says its version at /version.
+  const vllm = str(first?.owned_by) === "vllm" || num(first?.max_model_len) !== null;
+  const modelPath = str(props?.model_path) ?? (vllm ? str(first?.root) : null);
   const modelFile = modelPath ? baseName(modelPath) : null;
+  const version = str(obj(answers.version)?.version);
+  const build = str(props?.build_info) ?? (vllm ? (version ? `vLLM ${version}` : "vLLM") : null);
+  const maxSeqs = answers.metrics ? /max_num_seqs="(\d+)"/.exec(answers.metrics) : null;
+  const metricSlots = maxSeqs && Number(maxSeqs[1]) > 0 ? Number(maxSeqs[1]) : null;
 
   const modalities = obj(props?.modalities);
   const vision = typeof modalities?.vision === "boolean" ? modalities.vision : null;
@@ -132,11 +166,9 @@ export function readDetails(
     ? slotList.map((s) => num(obj(s)?.n_ctx)).filter((n): n is number => n !== null)
     : null;
 
-  const first = Array.isArray(obj(answers.models)?.data) ? obj((obj(answers.models)!.data as unknown[])[0]) : null;
-  const meta = obj(first?.meta);
-
-  // Per-slot context: prefer what /slots says about the slots themselves.
-  const contextPerSlot = slotContexts && slotContexts.length > 0 ? slotContexts[0]! : capacity.contextTokens;
+  // Per-slot context: prefer what /slots says about the slots themselves; vLLM's one-request limit otherwise.
+  const contextPerSlot =
+    slotContexts && slotContexts.length > 0 ? slotContexts[0]! : capacity.contextTokens ?? num(first?.max_model_len);
 
   return {
     laneId,
@@ -144,9 +176,9 @@ export function readDetails(
     reachable: answers.props !== null || answers.slots !== null || answers.models !== null,
     modelFile,
     quant: quantOf(modelFile),
-    build: str(props?.build_info),
-    slots: capacity.slots,
-    slotsSource: capacity.source,
+    build,
+    slots: capacity.slots ?? metricSlots,
+    slotsSource: capacity.slots === null && metricSlots !== null ? "server" : capacity.source,
     contextPerSlot,
     slotContexts: slotContexts && slotContexts.length > 0 ? slotContexts : null,
     vision,
@@ -167,7 +199,16 @@ export async function probeDetails(lane: LaneConfig, laneId: string, opts: Detai
     getJson(lane, "/slots", timeoutMs, fetchImpl),
     getJson(lane, "/v1/models", timeoutMs, fetchImpl),
   ]);
-  return readDetails(lane, laneId, { props, slots, models });
+  // vLLM only: asked after the rest, and only when /props did not answer, so a llama-server is not bothered.
+  let version: unknown | null = null;
+  let metrics: string | null = null;
+  if (props === null) {
+    [version, metrics] = await Promise.all([
+      getJson(lane, "/version", timeoutMs, fetchImpl),
+      getText(lane, "/metrics", timeoutMs, fetchImpl),
+    ]);
+  }
+  return readDetails(lane, laneId, { props, slots, models, version, metrics });
 }
 
 export function setupOf(d: MachineDetails): MachineSetup {
@@ -202,7 +243,7 @@ export function differences(details: MachineDetails[]): string[] {
 
   check("Model file", (d) => d.modelFile);
   check("Quantization", (d) => d.quant);
-  check("llama.cpp build", (d) => d.build);
+  check("Server build", (d) => d.build);
   check("Slots", (d) => d.slots);
   check("Context per slot", (d) => d.contextPerSlot, (v) => Number(v).toLocaleString("en-US"));
   check("Image support", (d) => d.vision, (v) => (v ? "on" : "off"));

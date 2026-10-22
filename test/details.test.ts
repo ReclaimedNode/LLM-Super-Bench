@@ -120,7 +120,7 @@ describe("differences", () => {
   test("says what differs and for whom", () => {
     const out = differences([base({}), base({ label: "B", laneId: "lane-1", quant: "Q4_K_M", build: "b2", slots: 4 })]);
     expect(out.some((l) => l.startsWith("Quantization differs: A Q8_0, B Q4_K_M"))).toBe(true);
-    expect(out.some((l) => l.includes("llama.cpp build differs"))).toBe(true);
+    expect(out.some((l) => l.includes("Server build differs"))).toBe(true);
     expect(out.some((l) => l.startsWith("Slots differs"))).toBe(true);
   });
 

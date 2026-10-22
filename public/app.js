@@ -641,7 +641,7 @@ function detailRows(m) {
     ["Model file", m.modelFile ?? "not reported"],
     ["Quantization", m.quant ? `${m.quant} (from the file name)` : "not in the file name"],
     ["Size", parameters ?? "not reported"],
-    ["llama.cpp build", m.build ?? "not reported"],
+    ["Server build", m.build ?? "not reported"],
     ["Slots", m.slots === null ? "not reported" : `${m.slots}${slotNote}`],
     ["Context per slot", perSlot],
     ["Trained context", tokensText(m.trainContext)],
