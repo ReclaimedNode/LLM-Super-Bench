@@ -878,3 +878,13 @@ are machine generated and must be said to be, wherever they are shown. The
 board prints that line under every video section, and the tests page
 prints it under every clip.
 
+
+## Credits
+
+LLM-Super-Bench is built on **LLM Race**, the harness in
+[theNetworkChuck/mac-studio-m5-ultra-local-ai](https://github.com/theNetworkChuck/mac-studio-m5-ultra-local-ai)
+by NetworkChuck, released under the MIT License. The race itself, the scoreboard, the timing rules and
+the on-screen design come from that project. Thank you to NetworkChuck for building it and sharing it.
+
+What this version adds is listed in [NOTICE.md](NOTICE.md). The original repository's data, writing and
+media are under their own licences and are not part of this one.
