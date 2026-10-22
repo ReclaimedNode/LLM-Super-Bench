@@ -118,8 +118,8 @@ if (import.meta.main) {
     }
     lanes.push({ ...parsed, notes: notes.get(parsed.label) });
   }
-  if (lanes.length < 2 || lanes.length > 4) {
-    console.error('\n  Give 2 to 4 machines, each as "Label=http://host:port".\n');
+  if (lanes.length < 1 || lanes.length > 4) {
+    console.error('\n  Give 1 to 4 machines, each as "Label=http://host:port".\n');
     process.exit(1);
   }
 

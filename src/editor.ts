@@ -22,14 +22,14 @@ export interface EditedLane {
   notes?: string;
 }
 
-export const MIN_MACHINES = 2;
+export const MIN_MACHINES = 1;
 export const MAX_MACHINES = 4;
 
 export function parseEditedLanes(body: unknown): { ok: true; lanes: EditedLane[] } | { ok: false; error: string } {
   const list = (body as { lanes?: unknown } | null)?.lanes;
   if (!Array.isArray(list)) return { ok: false, error: "Send the list of machines." };
   if (list.length < MIN_MACHINES || list.length > MAX_MACHINES) {
-    return { ok: false, error: `Keep between ${MIN_MACHINES} and ${MAX_MACHINES} machines. Pick one machine, or head to head, on the main screen.` };
+    return { ok: false, error: `Keep between ${MIN_MACHINES} and ${MAX_MACHINES} machines. Head to head uses two; solo uses one.` };
   }
   const lanes: EditedLane[] = [];
   const labels = new Set<string>();

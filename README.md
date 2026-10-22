@@ -43,9 +43,10 @@ To keep it running across reboots on the Mini, see *Hosting and the password* be
 
 ## Manage machines
 
-**MANAGE MACHINES** lists the machines being tested, two to four of them. For each: a name (what the
-scoreboard shows), an address, and optional notes about how it was started. You can add, change or
-remove machines. **SAVE AND USE** asks every machine for its exact model id first, and saves only if
+**MANAGE MACHINES** follows the choice under **MACHINES** at the top. **HEAD TO HEAD** shows two
+machine rows and **SOLO** shows one. For each: a name (what the scoreboard shows), an address, and
+optional notes about how it was started. In solo you change the first machine only; the second one
+you saved stays for head to head. **SAVE AND USE** asks every machine for its exact model id first, and saves only if
 all of them answer, so a typo cannot leave the page pointing at nothing. A machine you keep keeps the
 settings the page does not show (API key, slot count, extra request fields). Saving is refused while
 a race is running.

@@ -605,9 +605,13 @@ main {
 
 .editor-row {
   display: grid;
-  grid-template-columns: minmax(8rem, 1fr) minmax(14rem, 2fr) minmax(10rem, 2fr) auto;
+  grid-template-columns: minmax(8rem, 1fr) minmax(14rem, 2fr) minmax(10rem, 2fr);
   gap: 0.6rem;
   align-items: start;
+}
+
+.editor-row[hidden] {
+  display: none;
 }
 
 .editor-row input {

@@ -18,7 +18,6 @@ const el = {
   editorPanel: document.getElementById("editor-panel"),
   editorHint: document.getElementById("editor-hint"),
   editorRows: document.getElementById("editor-rows"),
-  editorAdd: document.getElementById("editor-add"),
   editorSave: document.getElementById("editor-save"),
   editorStatus: document.getElementById("editor-status"),
   machinesPanel: document.getElementById("machines-panel"),
@@ -50,6 +49,8 @@ let presetButtons = [];
 let racing = false;
 
 // Which machines race: "all" is head to head, anything else is one lane's id.
+// "head" races two machines against each other; "solo" runs the first one on its own.
+let mode = "head";
 let selectedMachine = "all";
 let machineButtons = [];
 let configLanes = [];
@@ -197,27 +198,41 @@ function speedUnitText(unit) {
   return shownStreams > 1 ? `${unit} per stream · median of ${shownStreams}` : unit;
 }
 
+function machineIdFor(m) {
+  return m === "head" || !configLanes[0] ? "all" : configLanes[0].laneId;
+}
+
+/** HEAD TO HEAD or SOLO. The machine rows under MANAGE MACHINES follow this choice. */
+function chooseMode(next) {
+  mode = next;
+  selectedMachine = machineIdFor(mode);
+  for (const b of machineButtons) b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
+  showLanes(selectedMachine === "all" ? "all" : [selectedMachine]);
+  refreshCapacity();
+  refreshMachines();
+  updateSweepNote();
+  el.editorStatus.textContent = "";
+  renderEditorMode();
+}
+
 function buildMachines(lanes) {
   configLanes = lanes;
+  selectedMachine = machineIdFor(mode);
   el.machines.textContent = "";
-  const options = [{ id: "all", label: "HEAD TO HEAD", title: "every machine races the same prompt at the same instant" }];
-  for (const lane of lanes) {
-    options.push({ id: lane.laneId, label: lane.label, title: `${lane.label} on its own, with nothing to race` });
-  }
+  const options = [
+    { id: "head", label: "HEAD TO HEAD", title: "two machines race the same prompt at the same instant" },
+    { id: "solo", label: "SOLO", title: "one machine on its own, with nothing to race" },
+  ];
   machineButtons = options.map((option) => {
     const button = document.createElement("button");
     button.type = "button";
     button.textContent = option.label;
     button.title = option.title;
-    button.setAttribute("aria-pressed", String(option.id === selectedMachine));
+    button.dataset.mode = option.id;
+    button.setAttribute("aria-pressed", String(option.id === mode));
     button.addEventListener("click", () => {
       if (racing) return;
-      selectedMachine = option.id;
-      for (const b of machineButtons) b.setAttribute("aria-pressed", String(b === button));
-      showLanes(option.id === "all" ? "all" : [option.id]);
-      refreshCapacity();
-      refreshMachines();
-      updateSweepNote();
+      chooseMode(option.id);
     });
     el.machines.append(button);
     return button;
@@ -432,7 +447,6 @@ function showStop(on) {
 }
 
 function setEditorBusy(busy) {
-  el.editorAdd.disabled = busy;
   el.editorSave.disabled = busy;
 }
 
@@ -481,9 +495,12 @@ async function checkRow(row) {
   return null;
 }
 
-let editorRowList = [];
+// Two fixed slots: head to head shows both, solo shows the first. Anything typed in a hidden slot is kept.
+let editorSlots = [];
+let savedLanes = [];
+let editorLoadToken = 0;
 
-function addEditorRow(lane) {
+function createSlot(lane, n) {
   const node = document.createElement("div");
   node.className = "editor-row";
   const field = (placeholder, value, label) => {
@@ -498,31 +515,32 @@ function addEditorRow(lane) {
   };
   const row = {
     node,
-    name: field("Name, e.g. Mac Studio", lane?.label, "Machine name"),
-    address: field("Address, e.g. http://192.168.1.50:8000", lane?.baseUrl, "Machine address"),
-    notes: field("Notes: how it was started (optional)", lane?.notes, "Notes about how this machine was started"),
-    remove: document.createElement("button"),
+    name: field(`Machine ${n} name, e.g. Mac Studio`, lane?.label, `Machine ${n} name`),
+    address: field("Address, e.g. http://192.168.1.50:8000", lane?.baseUrl, `Machine ${n} address`),
+    notes: field("Notes: how it was started (optional)", lane?.notes, `Notes about how machine ${n} was started`),
     status: document.createElement("p"),
   };
-  row.remove.type = "button";
-  row.remove.className = "remove";
-  row.remove.textContent = "REMOVE";
   row.status.className = "row-status";
   // Asked as soon as the address is entered, not when saving.
   row.address.addEventListener("change", () => checkRow(row));
-  row.remove.addEventListener("click", () => {
-    if (editorRowList.length <= MIN_MACHINES) {
-      el.editorStatus.textContent = `Keep at least ${MIN_MACHINES} machines. To test one machine, pick it under MACHINES on the main screen.`;
-      return;
-    }
-    editorRowList = editorRowList.filter((r) => r !== row);
-    node.remove();
-    el.editorStatus.textContent = "";
-  });
-  node.append(row.name, row.address, row.notes, row.remove, row.status);
+  node.append(row.name, row.address, row.notes, row.status);
   el.editorRows.append(node);
-  editorRowList.push(row);
   return row;
+}
+
+/** Shows two rows for head to head and one for solo. */
+function renderEditorMode() {
+  const count = mode === "head" ? 2 : 1;
+  editorSlots.forEach((row, i) => {
+    row.node.hidden = i >= count;
+  });
+  if (!editable) return;
+  el.editorHint.textContent =
+    (mode === "head"
+      ? "Head to head: two machines race the same prompt at the same instant. "
+      : "Solo: one machine on its own. ") +
+    "Each address is asked as soon as you enter it. " +
+    "Saving keeps the settings you do not see here (API key, slot count, extra request fields) for a machine you keep.";
 }
 
 async function loadEditor() {
@@ -530,36 +548,41 @@ async function loadEditor() {
     el.editorHint.textContent =
       "Changing machines from this page needs a password, because it lets the page ask any address on your network. " +
       "Stop the server and start it with RACE_PASSWORD=something-long bun run race, then reload.";
-    el.editorAdd.disabled = true;
     el.editorSave.disabled = true;
     return;
   }
-  el.editorHint.textContent =
-    `Between ${MIN_MACHINES} and ${MAX_MACHINES} machines. Each address is asked as soon as you enter it. ` +
-    "Saving keeps the settings you do not see here (API key, slot count, extra request fields) for a machine you keep.";
-  el.editorRows.textContent = "";
-  editorRowList = [];
+  // Two loads can start together (opening the panel and a reload); only the latest one may draw.
+  const token = ++editorLoadToken;
   try {
     const response = await fetch("/api/lanes-config");
     const answer = await response.json();
     if (!response.ok) throw new Error(answer.error ?? "not allowed");
-    for (const lane of answer.lanes) {
-      const row = addEditorRow(lane);
-      checkRow(row);
-    }
+    if (token !== editorLoadToken) return;
+    savedLanes = answer.lanes;
+    el.editorRows.textContent = "";
+    editorSlots = [0, 1].map((i) => createSlot(savedLanes[i], i + 1));
+    editorSlots.forEach((row, i) => {
+      if (savedLanes[i]) checkRow(row);
+    });
     editorLoaded = true;
+    renderEditorMode();
   } catch (err) {
-    el.editorStatus.textContent = `Could not load the machines: ${err.message}`;
+    if (token === editorLoadToken) el.editorStatus.textContent = `Could not load the machines: ${err.message}`;
   }
 }
 
 async function saveEditor() {
   if (racing) return;
-  const lanes = editorRowList.map((r) => ({
+  const shown = mode === "head" ? 2 : 1;
+  const lanes = editorSlots.slice(0, shown).map((r) => ({
     label: r.name.value.trim(),
     baseUrl: r.address.value.trim(),
     notes: r.notes.value.trim(),
   }));
+  // Solo changes the first machine only; the others already saved stay for head to head.
+  if (mode === "solo") {
+    for (const l of savedLanes.slice(1)) lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "" });
+  }
   setEditorBusy(true);
   el.editorStatus.textContent = "Asking every machine, then saving...";
   try {
@@ -569,7 +592,7 @@ async function saveEditor() {
       el.editorStatus.textContent = `Not saved. ${answer.error ?? "The server refused."}`;
       return;
     }
-    el.editorStatus.textContent = `Saved. Testing ${answer.lanes} machines.`;
+    el.editorStatus.textContent = mode === "head" ? "Saved. Head to head is ready." : "Saved. The solo machine is ready.";
     logLine(`Machines changed: now testing ${lanes.map((l) => l.label).join(", ")}.`, "good");
     await reloadMachines();
   } catch (err) {
@@ -582,11 +605,11 @@ async function saveEditor() {
 /** Redraws everything that depends on which machines there are. */
 async function reloadMachines() {
   const config = await (await fetch("/api/config")).json();
-  selectedMachine = "all";
+  if (config.lanes.length < 2) mode = "solo";
   buildLanes(config.lanes);
   buildMachines(config.lanes);
   resetLanes();
-  showLanes("all");
+  showLanes(selectedMachine === "all" ? "all" : [selectedMachine]);
   setStreamLayout(selectedStreams);
   updateSweepNote();
   refreshCapacity();
@@ -948,6 +971,10 @@ function renderScoreboard(scoreboard) {
 
 async function startRace() {
   if (racing) return;
+  if (mode === "head" && configLanes.length < 2) {
+    logLine("Head to head needs two machines. Add the second one under MANAGE MACHINES, or pick SOLO.", "bad");
+    return;
+  }
   racing = true;
   setEditorBusy(true);
   showStop(true);
@@ -1015,6 +1042,10 @@ async function readEvents(response) {
 
 async function startSweep() {
   if (racing) return;
+  if (mode === "head" && configLanes.length < 2) {
+    logLine("Head to head needs two machines. Add the second one under MANAGE MACHINES, or pick SOLO.", "bad");
+    return;
+  }
   const runs = sweepRunCount();
   if (runs === 0 || runs > SWEEP_MAX_RUNS) return;
 
@@ -1125,6 +1156,7 @@ async function boot() {
   const response = await fetch("/api/config");
   const config = await response.json();
 
+  mode = config.lanes.length >= 2 ? "head" : "solo";
   buildLanes(config.lanes);
   buildMachines(config.lanes);
   buildPresets(config.presets);
@@ -1133,7 +1165,7 @@ async function boot() {
   configStreamOptions = config.concurrencyOptions ?? [1];
   buildStreams(configStreamOptions);
   resetLanes();
-  showLanes("all");
+  showLanes(selectedMachine === "all" ? "all" : [selectedMachine]);
   setStreamLayout(1);
 
   el.start.addEventListener("click", startRace);
@@ -1143,14 +1175,6 @@ async function boot() {
   editable = config.editable === true;
   el.editorPanel.addEventListener("toggle", () => {
     if (el.editorPanel.open && !editorLoaded) loadEditor();
-  });
-  el.editorAdd.addEventListener("click", () => {
-    if (editorRowList.length >= MAX_MACHINES) {
-      el.editorStatus.textContent = `That is the most: ${MAX_MACHINES} machines.`;
-      return;
-    }
-    el.editorStatus.textContent = "";
-    addEditorRow({ label: "", baseUrl: "", notes: "" }).name.focus?.();
   });
   el.editorSave.addEventListener("click", saveEditor);
   // First run on the built-in mock machines: take the person straight to entering their own.

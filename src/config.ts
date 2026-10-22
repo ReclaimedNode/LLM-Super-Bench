@@ -45,8 +45,8 @@ export function validateConfig(raw: unknown): RaceConfig {
 
   const lanesRaw = obj.lanes;
   if (!Array.isArray(lanesRaw)) fail("needs a `lanes` array");
-  if (lanesRaw.length < 2 || lanesRaw.length > 4) {
-    fail(`needs between 2 and 4 lanes, found ${lanesRaw.length}`);
+  if (lanesRaw.length < 1 || lanesRaw.length > 4) {
+    fail(`needs between 1 and 4 lanes, found ${lanesRaw.length}`);
   }
 
   const lanes: LaneConfig[] = lanesRaw.map((laneRaw, i) => {

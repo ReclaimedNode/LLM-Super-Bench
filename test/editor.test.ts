@@ -56,8 +56,8 @@ describe("parseEditedLanes", () => {
       return r.ok ? null : r.error;
     };
     expect(err("nope")).toContain("list of machines");
-    expect(err([ok[0]])).toContain("between 2 and 4");
-    expect(err([...ok, ...ok, ok[0]])).toContain("between 2 and 4");
+    expect(err([])).toContain("between 1 and 4");
+    expect(err([...ok, ...ok, ok[0]])).toContain("between 1 and 4");
     expect(err([{ label: " ", baseUrl: "h:1" }, ok[1]])).toContain("Machine 1 needs a name");
     expect(err([{ label: "A", baseUrl: "h:1" }, { label: "A", baseUrl: "h:2" }])).toContain('Two machines are called "A"');
     expect(err([ok[0], { label: "B", baseUrl: "" }])).toContain("B needs an address");

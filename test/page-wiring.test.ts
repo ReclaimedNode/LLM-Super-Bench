@@ -50,7 +50,7 @@ describe("the race page and its script agree", () => {
   });
 
   test("the machine editor is wired to its endpoints", () => {
-    for (const id of ["editor-panel", "editor-rows", "editor-add", "editor-save", "editor-status"]) {
+    for (const id of ["editor-panel", "editor-rows", "editor-save", "editor-status"]) {
       expect(html).toContain(`id="${id}"`);
     }
     for (const path of ["/api/lanes-config", "/api/lanes/check", "/api/lanes/save"]) {
