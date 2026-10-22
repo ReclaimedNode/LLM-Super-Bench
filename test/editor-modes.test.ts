@@ -14,6 +14,10 @@ describe("the machine rows follow HEAD TO HEAD or SOLO", () => {
     expect(js).toMatch(/const count = mode === "head" \? 2 : 1/);
   });
 
+  test("a second machine that does not answer is dropped by a solo save, not sent", () => {
+    expect(js).toContain('row.status.textContent.startsWith("Answered")');
+  });
+
   test("two loads that start together cannot both draw rows", () => {
     expect(js).toContain("++editorLoadToken");
     expect(js).toContain("token !== editorLoadToken");

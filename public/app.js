@@ -579,9 +579,15 @@ async function saveEditor() {
     baseUrl: r.address.value.trim(),
     notes: r.notes.value.trim(),
   }));
-  // Solo changes the first machine only; the others already saved stay for head to head.
+  // Solo changes the first machine only. A machine already saved for head to head is kept only if it
+  // still answers, so a leftover that is switched off can never block saving the one machine.
   if (mode === "solo") {
-    for (const l of savedLanes.slice(1)) lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "" });
+    savedLanes.slice(1).forEach((l, i) => {
+      const row = editorSlots[i + 1];
+      if (row && row.status.textContent.startsWith("Answered")) {
+        lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "" });
+      }
+    });
   }
   setEditorBusy(true);
   el.editorStatus.textContent = "Asking every machine, then saving...";
