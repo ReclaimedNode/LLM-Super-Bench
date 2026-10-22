@@ -401,6 +401,19 @@ curl -N -X POST http://localhost:9500/api/sweep -H 'content-type: application/js
   -d '{"presets":["4k","16k"],"concurrencies":[1,2],"repeats":3}'
 ```
 
+## Charts and sharing results
+
+When a race or a sweep finishes, a **RESULTS** bar appears under the controls with two buttons:
+
+- **VIEW CHARTS** opens `/results.html` in a new tab. It draws bar charts of the machines side by side (first word, speed, total time, and throughput when there is more than one stream), plus line charts of how each number changes with prompt size and with streams per machine. Pick the prompt size and stream count at the top. Every chart has SAVE SVG and SAVE PNG.
+- **DOWNLOAD DATA** saves the run as a `.json` file (`llm-super-bench-run`). It holds the numbers, the reply length and thinking setting, and each machine's model, quant and server build. It does **not** hold addresses or host names, so it is safe to send to someone.
+
+On the results page, **ADD ANOTHER RUN FILE** loads a file someone else sent and draws their machines beside yours, labelled by file. **DOWNLOAD ALL SHOWN (.csv)** gives one spreadsheet of everything on screen. Run files are checked and cleaned when loaded; nothing in them is run.
+
+The server keeps the latest finished run in memory (served at `/api/last-run`) and also writes each one to `results/run-<race|sweep>-<time>.json`. Restarting the server clears the in-memory copy; open a saved file from `results/` with ADD ANOTHER RUN FILE.
+
+The original repo's charts were made differently: a small Python script (`scripts/charts.py`) wrote fixed SVG files from its `data/` folder. This page does the same kind of drawing live in your browser, from your own runs.
+
 ## Thinking models
 
 **REPLY LENGTH** and **THINKING** at the top of the page set these for every machine, so nothing

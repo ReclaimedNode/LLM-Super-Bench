@@ -49,6 +49,13 @@
       <button class="start stop" id="stop" type="button" hidden>STOP</button>
     </header>
 
+    <!-- Appears after a race or sweep finishes: the graphs open in a new tab, and the numbers can be saved to share. -->
+    <div class="resultsbar" id="resultsbar" hidden>
+      <span class="control-name">RESULTS</span>
+      <a class="start" id="view-charts" href="/results.html" target="_blank" rel="noopener">VIEW CHARTS</a>
+      <a class="start" id="download-data" href="/api/last-run" download="llm-super-bench-run.json">DOWNLOAD DATA</a>
+    </div>
+
     <!-- Which machines are tested. Head to head shows two machines, solo shows one; each address is asked as soon as it is typed. -->
     <details class="sweep" id="editor-panel">
       <summary>MANAGE MACHINES: WHAT IS TESTED</summary>

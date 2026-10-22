@@ -21,6 +21,8 @@ import { runRace } from "./race.ts";
 import { parseRaceRequest } from "./request.ts";
 import { concurrencyOptions } from "./streams.ts";
 import { REPLY_LENGTHS, applySettings, parseSettings } from "./settings.ts";
+import { RUN_FORMAT, buildRunFile, hasFinishedRun, raceRows } from "./runfile.ts";
+import type { RunFile } from "./runfile.ts";
 import { parseSweepRequest, runSweep } from "./sweep.ts";
 import type { SweepEvent } from "./sweep.ts";
 import type { RaceEvent } from "./types.ts";
@@ -32,6 +34,10 @@ const STATIC_FILES: Record<string, { file: string; type: string }> = {
   "/index.html": { file: "index.html", type: "text/html; charset=utf-8" },
   "/app.js": { file: "app.js", type: "text/javascript; charset=utf-8" },
   "/style.css": { file: "style.css", type: "text/css; charset=utf-8" },
+  "/results.html": { file: "results.html", type: "text/html; charset=utf-8" },
+  "/results.js": { file: "results.js", type: "text/javascript; charset=utf-8" },
+  "/charts.js": { file: "charts.js", type: "text/javascript; charset=utf-8" },
+  "/results.css": { file: "results.css", type: "text/css; charset=utf-8" },
 };
 
 const loaded = await loadConfig();
@@ -131,6 +137,21 @@ async function setupFor(
     setups[d.laneId] = setupOf(d);
   });
   return { slots, setups };
+}
+
+/** The latest finished race or sweep, for the results page. Also saved to results/ as it finishes. */
+let lastRun: RunFile | null = null;
+
+async function keepRun(file: RunFile): Promise<void> {
+  if (!hasFinishedRun(file)) return;
+  lastRun = file;
+  try {
+    const stamp = file.createdAt.replace(/[:.]/g, "-");
+    await mkdir(resolve(PROJECT_ROOT, "results"), { recursive: true });
+    await writeFile(resolve(PROJECT_ROOT, `results/run-${file.kind}-${stamp}.json`), JSON.stringify(file, null, 2) + "\n");
+  } catch {
+    /* the page still has it in memory */
+  }
 }
 
 const server = Bun.serve({
@@ -296,6 +317,12 @@ const server = Bun.serve({
       }
     }
 
+    // The latest finished race or sweep, as the file the results page draws and people can share.
+    if (url.pathname === "/api/last-run" && req.method === "GET") {
+      if (!lastRun) return Response.json({ error: "Nothing has finished yet. Run a race or a sweep first." }, { status: 404 });
+      return Response.json(lastRun, { headers: { "Cache-Control": "no-store" } });
+    }
+
     // What each machine says about itself, and where two machines are set up differently.
     if (url.pathname === "/api/machines" && req.method === "GET") {
       const asked = url.searchParams.get("lanes");
@@ -347,7 +374,21 @@ const server = Bun.serve({
           config: raceConfig,
           preset,
           sourceText,
-          emit,
+          emit: (event) => {
+            if (event.type === "race-done") {
+              void keepRun(
+                buildRunFile({
+                  kind: "race",
+                  rows: raceRows(preset, concurrency, event.results),
+                  lanes: raceConfig.lanes.map((l, i) => ({ laneId: `lane-${i}`, label: l.label, displayModel: l.displayModel, model: l.model })),
+                  setups: asked.setups,
+                  maxTokens: raceConfig.maxTokens,
+                  thinking: raceConfig.thinking,
+                }),
+              );
+            }
+            emit(event);
+          },
           laneIds: racingLaneIds,
           concurrency,
           laneSlots: concurrency > 1 ? asked.slots : {},
@@ -397,6 +438,17 @@ const server = Bun.serve({
             mkdir(resolve(PROJECT_ROOT, "results"), { recursive: true })
               .then(() => writeFile(resolve(PROJECT_ROOT, savedAs), event.csv))
               .catch(() => {});
+            void keepRun(
+              buildRunFile({
+                kind: "sweep",
+                rows: event.rows,
+                lanes: raceConfig.lanes.map((l, i) => ({ laneId: `lane-${i}`, label: l.label, displayModel: l.displayModel, model: l.model })),
+                setups: asked.setups,
+                maxTokens: raceConfig.maxTokens,
+                thinking: raceConfig.thinking,
+                complete: event.complete,
+              }),
+            );
             emit({ ...event, savedAs } as SweepEvent);
           },
         });

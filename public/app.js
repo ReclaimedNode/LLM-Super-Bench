@@ -33,6 +33,7 @@ const el = {
   sweepRepeats: document.getElementById("sweep-repeats"),
   sweepNote: document.getElementById("sweep-note"),
   sweepStart: document.getElementById("sweep-start"),
+  resultsBar: document.getElementById("resultsbar"),
   sweepCsv: document.getElementById("sweep-csv"),
   sweepTableWrap: document.getElementById("sweep-table-wrap"),
   sweepHead: document.getElementById("sweep-head"),
@@ -850,6 +851,7 @@ function buildPresets(presets) {
 function onEvent(event) {
   switch (event.type) {
     case "race-start": {
+      el.resultsBar.hidden = true;
       const chars = event.promptChars.toLocaleString("en-US");
       const who = event.lanes.length > 1
         ? `head to head, ${event.lanes.map((l) => l.label).join(" vs ")}`
@@ -984,6 +986,7 @@ function onEvent(event) {
     }
 
     case "race-done":
+      el.resultsBar.hidden = false;
       renderScoreboard(event.scoreboard);
       warnAboutThinking();
       break;
@@ -1001,6 +1004,7 @@ function onEvent(event) {
       break;
 
     case "sweep-done":
+      el.resultsBar.hidden = false;
       renderSweepTable(event.rows);
       sweepCsvText = event.csv;
       el.sweepCsv.hidden = false;

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM-Super-Bench results</title>
+    <link rel="stylesheet" href="/results.css" />
+  </head>
+  <body>
+    <main>
+      <header class="bar">
+        <div class="brand">
+          <span class="brand-mark"></span>
+          <h1>LLM-SUPER-BENCH <span class="sub">RESULTS</span></h1>
+        </div>
+        <a class="link" href="/">BACK TO THE RACE</a>
+      </header>
+
+      <section class="panel" id="sources-panel">
+        <h2>RUNS SHOWN</h2>
+        <p class="note" id="sources-note"></p>
+        <ul class="chips" id="sources"></ul>
+        <div class="actions">
+          <button class="btn" id="add-file" type="button">ADD ANOTHER RUN FILE</button>
+          <button class="btn" id="download-json" type="button" disabled>DOWNLOAD THIS SERVER'S RUN (.json)</button>
+          <button class="btn" id="download-csv" type="button" disabled>DOWNLOAD ALL SHOWN (.csv)</button>
+          <input id="file-input" type="file" accept=".json,application/json" multiple hidden />
+        </div>
+        <p class="note">A run file holds the numbers and how each machine was set up. It has no addresses or host names, so it is safe to send to someone. Add their file here to draw their machines beside yours.</p>
+        <p class="note bad" id="problem" role="alert"></p>
+      </section>
+
+      <section class="panel" id="picker" hidden>
+        <div class="control"><span class="control-name" id="size-name">PROMPT SIZE</span><div class="choices" id="size" role="group" aria-labelledby="size-name"></div></div>
+        <div class="control"><span class="control-name" id="streams-name">STREAMS PER MACHINE</span><div class="choices" id="streams" role="group" aria-labelledby="streams-name"></div></div>
+      </section>
+
+      <section id="charts"></section>
+
+      <section class="panel" id="setups-panel" hidden>
+        <h2>HOW EACH MACHINE WAS SET UP</h2>
+        <div class="table-wrap"><table id="setups"></table></div>
+      </section>
+    </main>
+    <script type="module" src="/results.js"></script>
+  </body>
+</html>

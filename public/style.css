@@ -708,3 +708,7 @@ main {
   color: var(--nc-cream);
   border: 2px solid var(--nc-cream);
 }
+
+.resultsbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border: 2px solid var(--edge, #34363a); }
+.resultsbar[hidden] { display: none; }
+.resultsbar a.start { text-decoration: none; display: inline-block; }

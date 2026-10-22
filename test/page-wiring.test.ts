@@ -58,3 +58,18 @@ describe("the race page and its script agree", () => {
     }
   });
 });
+
+describe("results page", () => {
+  const resultsHtml = readFileSync(resolve(PROJECT_ROOT, "public/results.html"), "utf8");
+  const resultsJs = readFileSync(resolve(PROJECT_ROOT, "public/results.js"), "utf8");
+  test("every id results.js looks up is in results.html", () => {
+    const wanted = [...resultsJs.matchAll(/\$\("([^"]+)"\)/g)].map((m) => m[1]!);
+    expect(wanted.length).toBeGreaterThan(8);
+    for (const id of wanted) expect(resultsHtml).toContain(`id="${id}"`);
+  });
+  test("the race page links to it and can download the data", () => {
+    expect(html).toContain('href="/results.html"');
+    expect(html).toContain('href="/api/last-run"');
+    expect(script).toContain("resultsBar.hidden = false");
+  });
+});
