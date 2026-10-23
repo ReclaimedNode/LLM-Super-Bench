@@ -1,15 +1,35 @@
 # LLM-Super-Bench
 
-(Formerly "LLM Race". The commands and file names, such as `bun run race` and `race.config.json`, are unchanged.)
+> **Based on the harness in NetworkChuck's [mac-studio-m5-ultra-local-ai](https://github.com/theNetworkChuck/mac-studio-m5-ultra-local-ai)** (MIT).
+> This is an independent project built on that work, not an official release. The original race, scoreboard and
+> timing rules are NetworkChuck's; see [Credits](#credits) and [NOTICE.md](NOTICE.md) for what was added.
 
-Based on the harness in [theNetworkChuck/mac-studio-m5-ultra-local-ai](https://github.com/theNetworkChuck/mac-studio-m5-ultra-local-ai)
-(MIT). See [NOTICE.md](NOTICE.md).
+(Formerly "LLM Race". The commands and file names, such as `bun run race` and `race.config.json`, are unchanged.)
 
 Send the same prompt to two, three or four computers running local AI models at the same
 instant. Watch the replies stream side by side. Get an honest scoreboard.
 
 It is both the measuring instrument and the on-camera graphic, so the rule throughout is that
 no number appears under a name it has not earned.
+
+## Run it yourself, from zero
+
+**What you need**
+- One computer to run this page (any Mac, Linux or Windows machine with [Bun](https://bun.sh) installed). It only sends requests and draws charts, so a small machine is fine.
+- One or more computers running a local model behind an **OpenAI-compatible server**. That is the thing being tested. Common ways to get one (check each engine's own docs for the current command):
+  - llama.cpp: `llama-server -m model.gguf --host 0.0.0.0 --port 8000`
+  - vLLM: `vllm serve <model> --host 0.0.0.0 --port 8000`
+  - Ollama, LM Studio, SGLang, TGI, KoboldCpp, TensorFold, MLX-LM: start their server and note its address. See [Engines](#engines).
+- The machines must be reachable from the computer running this page. Bind the server to `0.0.0.0` (not just localhost) and allow the port through any firewall.
+
+**Steps**
+1. `git clone https://github.com/reclaimednode/LLM-Super-Bench && cd LLM-Super-Bench`
+2. Try it with no hardware first: `bun run mock` in one terminal, `bun run race` in another, open the URL it prints and press START.
+3. Point it at your real machines: `RACE_PASSWORD='something-long' bun run race`, open the page, and add each machine's name and address under **MANAGE MACHINES** (for example `http://192.168.1.50:8000`). The page asks each machine what it is running and saves the list for you.
+4. Pick **HEAD TO HEAD** or **SOLO**, a prompt size and a stream count, then press START. Use **SWEEP** to run many sizes and stream counts in one go.
+5. When it finishes, **VIEW CHARTS** shows the graphs and **DOWNLOAD DATA** saves a file you can send to others to compare. See [Charts and sharing results](#charts-and-sharing-results).
+
+Run a model that thinks before it answers? Read [Thinking models](#thinking-models) first, or the reply may look empty.
 
 ## Quick start (a headless Mac Mini and your machines)
 
