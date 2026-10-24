@@ -625,13 +625,14 @@ function createSlot(lane, n) {
     address: field("Address, e.g. http://192.168.1.50:8000", lane?.baseUrl, `Machine ${n} address`),
     notes: field("Notes: how it was started (optional)", lane?.notes, `Notes about how machine ${n} was started`),
     engine: field("Engine (optional: only if it is not detected, e.g. TensorFold)", lane?.engine, `Inference engine of machine ${n}`),
+    watts: field("Average watts under load (optional, for speed per watt)", lane?.watts ?? "", `Average watts machine ${n} draws under load`),
     slots: field("Streams at once (blank: ask the machine)", lane?.slots ?? "", `Streams machine ${n} runs at once`),
     status: document.createElement("p"),
   };
   row.status.className = "row-status";
   // Asked as soon as the address is entered, not when saving.
   row.address.addEventListener("change", () => checkRow(row));
-  node.append(row.name, row.address, row.notes, row.engine, row.slots, row.status);
+  node.append(row.name, row.address, row.notes, row.engine, row.watts, row.slots, row.status);
   el.editorRows.append(node);
   return row;
 }
@@ -687,6 +688,7 @@ async function saveEditor() {
     baseUrl: r.address.value.trim(),
     notes: r.notes.value.trim(),
     engine: r.engine.value.trim(),
+    watts: r.watts.value.trim() === "" ? null : Number(r.watts.value.trim()),
     slots: slotsOf(r),
   }));
   // Solo changes the first machine only. A machine already saved for head to head is kept only if it
@@ -695,7 +697,7 @@ async function saveEditor() {
     savedLanes.slice(1).forEach((l, i) => {
       const row = editorSlots[i + 1];
       if (row && row.status.textContent.startsWith("Answered")) {
-        lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", engine: l.engine ?? "", slots: l.slots ?? null });
+        lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", engine: l.engine ?? "", watts: l.watts ?? null, slots: l.slots ?? null });
       }
     });
   }

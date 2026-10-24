@@ -21,6 +21,8 @@ export interface RunFileMachine {
   /** The short model name. Never a folder or an address. */
   model: string;
   setup: MachineSetup | null;
+  /** Average watts the person measured for this machine under load. Theirs, not measured here. */
+  watts?: number;
 }
 
 export interface RunFile {
@@ -32,6 +34,8 @@ export interface RunFile {
   settings: { maxTokens: number; thinking: "auto" | "low" | "off" };
   /** False when a sweep was stopped before it finished. */
   complete: boolean;
+  /** Which version of this tool made the file. */
+  tool?: { version: string; commit: string | null };
   machines: RunFileMachine[];
   rows: SweepRow[];
 }
@@ -39,7 +43,8 @@ export interface RunFile {
 export interface BuildRunFileOptions {
   kind: "race" | "sweep";
   rows: SweepRow[];
-  lanes: { laneId: string; label: string; displayModel?: string; model: string }[];
+  lanes: { laneId: string; label: string; displayModel?: string; model: string; watts?: number }[];
+  tool?: { version: string; commit: string | null };
   setups: Record<string, MachineSetup>;
   maxTokens: number;
   thinking?: "auto" | "low" | "off";
@@ -56,6 +61,7 @@ export function buildRunFile(o: BuildRunFileOptions): RunFile {
     createdAt: (o.now ?? new Date()).toISOString(),
     settings: { maxTokens: o.maxTokens, thinking: o.thinking ?? "auto" },
     complete: o.complete ?? true,
+    ...(o.tool ? { tool: o.tool } : {}),
     machines: o.lanes
       .filter((l) => used.has(l.laneId))
       .map((l) => ({
@@ -63,6 +69,7 @@ export function buildRunFile(o: BuildRunFileOptions): RunFile {
         label: l.label,
         model: baseName(l.displayModel ?? l.model),
         setup: o.setups[l.laneId] ?? null,
+        ...(l.watts !== undefined ? { watts: l.watts } : {}),
       })),
     rows: o.rows,
   };

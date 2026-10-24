@@ -22,6 +22,8 @@ export interface EditedLane {
   notes?: string;
   /** Engine name typed in, for servers that cannot be asked. Empty clears it. */
   engine?: string;
+  /** Measured average watts. A number sets it, null clears it, absent keeps what was saved. */
+  watts?: number | null;
   /** Streams the machine runs at once. A number sets it, null clears it (the machine is asked), absent keeps what was saved. */
   slots?: number | null;
 }
@@ -51,6 +53,15 @@ export function parseEditedLanes(body: unknown): { ok: true; lanes: EditedLane[]
     if (notes.length > 300) return { ok: false, error: `${label}'s notes are longer than 300 characters.` };
     const engine = typeof row.engine === "string" ? row.engine.trim() : "";
     if (engine.length > 40) return { ok: false, error: `${label}'s engine name is longer than 40 characters.` };
+    let watts: number | null | undefined;
+    if (row.watts === null || row.watts === "") watts = null;
+    else if (row.watts !== undefined) {
+      const w = typeof row.watts === "string" ? Number(row.watts.trim()) : row.watts;
+      if (typeof w !== "number" || !Number.isFinite(w) || w < 1 || w > 5000) {
+        return { ok: false, error: `${label}'s watts must be a number from 1 to 5000, or empty.` };
+      }
+      watts = w;
+    }
     let slots: number | null | undefined;
     if (row.slots === null || row.slots === "") slots = null;
     else if (row.slots !== undefined) {
@@ -60,7 +71,7 @@ export function parseEditedLanes(body: unknown): { ok: true; lanes: EditedLane[]
       }
       slots = n;
     }
-    lanes.push({ label, baseUrl, ...(notes ? { notes } : {}), ...(engine ? { engine } : {}), ...(slots !== undefined ? { slots } : {}) });
+    lanes.push({ label, baseUrl, ...(notes ? { notes } : {}), ...(engine ? { engine } : {}), ...(watts !== undefined ? { watts } : {}), ...(slots !== undefined ? { slots } : {}) });
   }
   return { ok: true, lanes };
 }
@@ -79,12 +90,14 @@ export function mergeLanes(existing: LaneConfig[], edited: EditedLane[], modelId
       if (before.model === modelId && before.displayModel) kept.displayModel = before.displayModel;
       if (before.apiKey) kept.apiKey = before.apiKey;
       if (before.slots !== undefined && e.slots === undefined) kept.slots = before.slots;
+      if (before.watts !== undefined && e.watts === undefined) kept.watts = before.watts;
       if (before.extraBody) kept.extraBody = before.extraBody;
     }
     if (kept.displayModel === "") delete kept.displayModel;
     if (typeof e.slots === "number") kept.slots = e.slots;
     if (e.notes) kept.notes = e.notes;
     if (e.engine) kept.engine = e.engine;
+    if (typeof e.watts === "number") kept.watts = e.watts;
     return kept;
   });
 }

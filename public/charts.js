@@ -42,6 +42,7 @@ export const METRICS = [
   { key: "speed", label: "Speed", unit: (r) => `${r?.speedUnit ?? "tokens/sec"}`, lowerBetter: false, digits: 1, note: "How fast one stream writes. Higher is better." },
   { key: "throughput", label: "Throughput", unit: (r) => `${r?.speedUnit ?? "tokens/sec"}`, lowerBetter: false, digits: 1, note: "Every stream together. Higher is better.", needsStreams: true },
   { key: "promptSpeed", label: "Prompt speed", unit: () => "prompt tokens/sec", lowerBetter: false, digits: 0, note: "Prompt tokens divided by seconds to the first word. Higher is better. Blank when it would be a guess." },
+  { key: "efficiency", label: "Efficiency", unit: () => "tokens/sec per watt", lowerBetter: false, digits: 2, note: "Speed divided by the watts you entered. Higher is better." },
   { key: "totalSec", label: "Total time", unit: () => "seconds", lowerBetter: true, digits: 2, note: "Seconds from sending the request to the last word. Lower is better." },
 ];
 
@@ -100,6 +101,7 @@ export function readRunFile(raw) {
       id: text(m?.id, 20),
       label: text(m?.label, 60),
       model: text(m?.model, 120),
+      watts: finite(m?.watts) !== null && m.watts >= 1 && m.watts <= 5000 ? m.watts : null,
       setup: {
         engine: text(s.engine, 40) || null,
         modelFile: text(s.modelFile, 120) || null,
@@ -118,11 +120,21 @@ export function readRunFile(raw) {
       kind: raw.kind === "sweep" ? "sweep" : "race",
       createdAt: text(raw.createdAt, 40),
       complete: raw.complete !== false,
+      tool: raw.tool && typeof raw.tool === "object" ? { version: text(raw.tool.version, 20), commit: /^[0-9a-f]{7,40}$/i.test(text(raw.tool.commit, 40)) ? text(raw.tool.commit, 40).toLowerCase() : null } : null,
       settings: { maxTokens: finite(settings.maxTokens), thinking: ["auto", "low", "off"].includes(settings.thinking) ? settings.thinking : "auto" },
       machines,
       rows,
     },
   };
+}
+
+/** Speed per watt, from the watts the person entered. One stream uses its speed; several use every stream together. */
+function withEfficiency(row, watts) {
+  if (watts === null || row.speedUnit !== "tokens/sec") return row;
+  const basis = row.concurrency > 1 && row.throughput ? row.throughput : row.speed;
+  if (!basis) return row;
+  const per = (v) => v / watts;
+  return { ...row, efficiency: { median: per(basis.median), min: per(basis.min), max: per(basis.max) } };
 }
 
 /**
@@ -141,7 +153,7 @@ export function buildSeries(sources) {
         source: source.name,
         file: source.file,
         machine,
-        rows: source.file.rows.filter((r) => r.label === label),
+        rows: source.file.rows.filter((r) => r.label === label).map((r) => withEfficiency(r, machine?.watts ?? null)),
       });
     }
   }
@@ -191,7 +203,7 @@ export function rowsToCsv(series) {
     "throughput_median", "throughput_min", "throughput_max",
     "prompt_speed_median", "prompt_speed_min", "prompt_speed_max",
     "total_median", "total_min", "total_max",
-    "engine", "model_file", "quant", "build", "slots", "context_per_slot", "notes", "max_tokens", "thinking",
+    "engine", "model_file", "quant", "build", "slots", "context_per_slot", "notes", "max_tokens", "thinking", "watts", "speed_per_watt_median", "tool_version", "tool_commit",
   ];
   const out = [head.join(",")];
   const trio = (s) => (s ? [s.median, s.min, s.max] : ["", "", ""]);
@@ -203,6 +215,7 @@ export function rowsToCsv(series) {
         ...trio(r.firstWordSec), ...trio(r.speed), ...trio(r.throughput), ...trio(r.promptSpeed), ...trio(r.totalSec),
         safeText(setup.engine), safeText(setup.modelFile), setup.quant, safeText(setup.build), setup.slots, setup.contextPerSlot, safeText(setup.notes),
         s.file.settings.maxTokens, s.file.settings.thinking,
+        s.machine?.watts ?? "", r.efficiency ? r.efficiency.median : "", safeText(s.file.tool?.version ?? ""), s.file.tool?.commit ?? "",
       ].map(csvCell).join(","));
     }
   }
@@ -241,14 +254,21 @@ function frame(width, height, title, note, body, footer = "") {
   );
 }
 
+/** Enough decimals that every tick label is exact: a 10 axis steps by 2.5, so it must not print "3". */
+function tickDigits(step) {
+  for (let d = 0; d <= 3; d++) if (Math.abs(step * 10 ** d - Math.round(step * 10 ** d)) < 1e-9) return d;
+  return 2;
+}
+
 function axis(left, top, right, bottom, max, unit, digits) {
   const parts = [];
   const steps = 4;
+  const tickD = tickDigits(max / steps);
   for (let i = 0; i <= steps; i++) {
     const v = (max * i) / steps;
     const y = bottom - ((bottom - top) * i) / steps;
     parts.push(`<line x1="${left}" x2="${right}" y1="${y.toFixed(1)}" y2="${y.toFixed(1)}" stroke="${i === 0 ? COLORS.base : COLORS.grid}"/>`);
-    parts.push(`<text x="${left - 8}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end" fill="${COLORS.muted}">${esc(fmt(v, max < 10 ? 1 : 0))}</text>`);
+    parts.push(`<text x="${left - 8}" y="${(y + 4).toFixed(1)}" font-size="11" text-anchor="end" fill="${COLORS.muted}">${esc(fmt(v, tickD))}</text>`);
   }
   parts.push(`<text x="14" y="${((top + bottom) / 2).toFixed(1)}" font-size="11" fill="${COLORS.muted}" text-anchor="middle" transform="rotate(-90 14 ${((top + bottom) / 2).toFixed(1)})">${esc(unit)}</text>`);
   return parts.join("");

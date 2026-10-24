@@ -1,5 +1,5 @@
 import {
-  METRICS, barChartSvg, buildSeries, cells, lineChartSvg, presetLabel, readRunFile, rowAt, rowsToCsv, MAX_FILE_BYTES,
+  METRICS, barChartSvg, esc, buildSeries, cells, lineChartSvg, presetLabel, readRunFile, rowAt, rowsToCsv, MAX_FILE_BYTES,
 } from "/charts.js";
 
 const $ = (id) => document.getElementById(id);
@@ -8,7 +8,11 @@ const el = {
   addFile: $("add-file"), fileInput: $("file-input"), json: $("download-json"), csv: $("download-csv"),
   picker: $("picker"), size: $("size"), streams: $("streams"), charts: $("charts"),
   setupsPanel: $("setups-panel"), setups: $("setups"),
+  report: $("download-report"), savedRow: $("saved-row"), saved: $("saved-runs"), addSaved: $("add-saved"), versionNote: $("version-note"),
 };
+
+let collected = [];
+let currentGroup = "";
 
 const sources = []; // { name, file, raw?, removable }
 let series = [];
@@ -49,6 +53,7 @@ function svgToPng(svgText, name) {
 }
 
 function figure(title, svgText) {
+  collected.push({ group: currentGroup, title, svg: svgText });
   const fig = document.createElement("figure");
   fig.innerHTML = svgText; // built by charts.js, which escapes every string
   const actions = document.createElement("div");
@@ -86,6 +91,7 @@ function valueOf(row, key) {
 }
 
 function group(title, note) {
+  currentGroup = title;
   const wrap = document.createElement("div");
   wrap.className = "group";
   const h = document.createElement("h2");
@@ -105,7 +111,15 @@ function group(title, note) {
 
 function render() {
   series = buildSeries(sources);
+  collected = [];
   el.json.disabled = serverRaw === null;
+  el.report.disabled = series.length === 0;
+
+  // Files made by different versions of the tool may have been timed by different rules.
+  const made = [...new Set(sources.map((s) => s.file.tool?.commit?.slice(0, 7) ?? s.file.tool?.version ?? "").filter(Boolean))];
+  el.versionNote.textContent = made.length > 1
+    ? `These files were made by different versions of the tool (${made.join(", ")}). Timing rules can differ between versions, so compare with care.`
+    : "";
   el.csv.disabled = series.length === 0;
 
   el.sources.textContent = "";
@@ -199,10 +213,20 @@ function render() {
     if (g.grid.children.length > 0) el.charts.append(g.wrap);
   }
 
+  // Watts were entered but no speed is in tokens: say why there is no efficiency chart.
+  const hasWatts = series.some((s) => s.machine?.watts);
+  const hasEfficiency = series.some((s) => s.rows.some((r) => r.efficiency));
+  if (hasWatts && !hasEfficiency) {
+    const p = document.createElement("p");
+    p.className = "note";
+    p.textContent = "Watts were entered, but speed per watt needs real token counts and these servers only reported streamed chunks, so that chart is left out.";
+    el.charts.append(p);
+  }
+
   // Setups.
   el.setups.textContent = "";
   const head = document.createElement("tr");
-  for (const h of ["MACHINE", "FROM", "ENGINE", "MODEL FILE", "QUANT", "BUILD", "SLOTS", "REPLY LENGTH", "THINKING", "NOTES"]) {
+  for (const h of ["MACHINE", "FROM", "ENGINE", "MODEL FILE", "QUANT", "BUILD", "SLOTS", "REPLY LENGTH", "THINKING", "WATTS", "NOTES"]) {
     const th = document.createElement("th");
     th.textContent = h;
     head.append(th);
@@ -211,12 +235,76 @@ function render() {
   for (const s of series) {
     const st = s.machine?.setup ?? {};
     const tr = document.createElement("tr");
-    for (const v of [s.display, s.source, st.engine ?? "", st.modelFile ?? s.machine?.model ?? "", st.quant ?? "", st.build ?? "", st.slots ?? "", s.file.settings.maxTokens ?? "", s.file.settings.thinking, st.notes ?? ""]) {
+    for (const v of [s.display, s.source, st.engine ?? "", st.modelFile ?? s.machine?.model ?? "", st.quant ?? "", st.build ?? "", st.slots ?? "", s.file.settings.maxTokens ?? "", s.file.settings.thinking, s.machine?.watts ?? "", st.notes ?? ""]) {
       const td = document.createElement("td");
       td.textContent = String(v);
       tr.append(td);
     }
     el.setups.append(tr);
+  }
+}
+
+/** One self-contained page: charts, setup table, no scripts, nothing fetched. Every string is escaped. */
+function buildReport() {
+  const when = new Date().toISOString().slice(0, 16).replace("T", " ");
+  const groups = [];
+  for (const f of collected) {
+    let g = groups.find((x) => x.name === f.group);
+    if (!g) groups.push((g = { name: f.group, items: [] }));
+    g.items.push(f);
+  }
+  const rows = series.map((s) => {
+    const st = s.machine?.setup ?? {};
+    const cells = [s.display, s.source, st.engine, st.modelFile ?? s.machine?.model, st.quant, st.build, st.slots, s.file.settings.maxTokens, s.file.settings.thinking, s.machine?.watts ? `${s.machine.watts} W` : "", st.notes];
+    return `<tr>${cells.map((c) => `<td>${esc(c ?? "")}</td>`).join("")}</tr>`;
+  }).join("");
+  const head = ["MACHINE", "FROM", "ENGINE", "MODEL", "QUANT", "BUILD", "SLOTS", "REPLY LENGTH", "THINKING", "WATTS", "NOTES"].map((h) => `<th>${h}</th>`).join("");
+  const body = groups.map((g) => `<h2>${esc(g.name)}</h2><div class="grid">${g.items.map((i) => `<figure>${i.svg}</figure>`).join("")}</div>`).join("");
+  const tools = [...new Set(sources.map((s) => (s.file.tool ? `${s.file.tool.version}${s.file.tool.commit ? ` (${s.file.tool.commit.slice(0, 7)})` : ""}` : "")).filter(Boolean))];
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LLM-Super-Bench report</title><style>
+body{margin:0;background:#121315;color:#f1efe4;font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif}
+main{max-width:1300px;margin:0 auto;padding:20px}h1{margin:0 0 4px}h2{margin:28px 0 6px;font-size:.95rem;letter-spacing:.08em}
+.note{color:#a9a79d;font-size:.85rem}.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,600px),1fr));gap:14px}
+figure{margin:0}svg{max-width:100%;height:auto}.t{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:.85rem}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid #34363a;vertical-align:top}th{color:#a9a79d;font-size:.72rem;letter-spacing:.08em}
+</style></head><body><main><h1>LLM-Super-Bench report</h1>
+<p class="note">Made ${esc(when)} from: ${esc(sources.map((s) => s.name).join(", "))}${tools.length ? ` · tool ${esc(tools.join(", "))}` : ""}. Speed per watt uses watts the person entered; it is not measured.</p>
+${body}<h2>HOW EACH MACHINE WAS SET UP</h2><div class="t"><table><tr>${head}</tr>${rows}</table></div>
+<p class="note">Made with LLM-Super-Bench, based on NetworkChuck's harness (MIT): github.com/reclaimednode/LLM-Super-Bench</p></main></body></html>`;
+}
+
+async function loadSaved() {
+  try {
+    const response = await fetch("/api/runs");
+    if (!response.ok) return;
+    const { runs } = await response.json();
+    if (!Array.isArray(runs) || runs.length === 0) return;
+    el.saved.textContent = "";
+    for (const r of runs) {
+      if (typeof r?.name !== "string") continue;
+      const o = document.createElement("option");
+      o.value = r.name;
+      o.textContent = `${String(r.createdAt).slice(0, 16).replace("T", " ")} · ${r.kind}${r.complete === false ? " (stopped early)" : ""}`;
+      el.saved.append(o);
+    }
+    el.savedRow.hidden = el.saved.options.length === 0;
+  } catch {
+    /* no saved runs to offer */
+  }
+}
+
+async function addSavedRun() {
+  const name = el.saved.value;
+  if (!name || sources.some((s) => s.savedName === name)) return;
+  try {
+    const response = await fetch(`/api/runs/${encodeURIComponent(name)}`);
+    const result = readRunFile(await response.json());
+    if (!result.ok) { el.problem.textContent = `${name}: ${result.error}`; return; }
+    addSource(name.replace(/^run-|\.json$/g, ""), result.file, { savedName: name });
+    el.problem.textContent = "";
+    render();
+  } catch {
+    el.problem.textContent = "That saved run could not be read.";
   }
 }
 
@@ -269,6 +357,9 @@ el.fileInput.addEventListener("change", () => {
   el.fileInput.value = "";
 });
 el.json.addEventListener("click", () => serverRaw && download(`llm-super-bench-${day()}.json`, "application/json", serverRaw));
+el.report.addEventListener("click", () => download(`llm-super-bench-report-${day()}.html`, "text/html", buildReport()));
+el.addSaved.addEventListener("click", addSavedRun);
 el.csv.addEventListener("click", () => download(`llm-super-bench-${day()}.csv`, "text/csv", rowsToCsv(series)));
 
 boot();
+loadSaved();

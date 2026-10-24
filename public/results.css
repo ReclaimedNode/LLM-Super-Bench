@@ -41,3 +41,6 @@ figure svg { max-width: 100%; height: auto; }
 table { border-collapse: collapse; width: 100%; font-size: 0.85rem; }
 th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--edge); vertical-align: top; }
 th { font-family: var(--font-head); font-size: 0.72rem; letter-spacing: 0.08em; color: var(--dim); }
+
+select { font: inherit; color: var(--ink); background: var(--bg); border: 2px solid var(--edge); padding: 0.45em 0.7em; max-width: 100%; }
+label.control-name { align-self: center; }

@@ -1,0 +1,22 @@
+# Changelog
+
+## 1.1.0
+
+- Charts page (`/results.html`) with bar and line charts, SVG and PNG export, a CSV of everything shown, and a
+  self-contained HTML report you can post or send. Saved runs on the server can be added from a list.
+- Run files (`.json`) you can share and load beside your own. They carry no addresses.
+- Engines: llama.cpp, vLLM, Ollama, LM Studio, SGLang, KoboldCpp, TGI, TensorRT-LLM and Strata are recognised;
+  others can be named by hand (for example TensorFold). The right thinking switch is sent per engine.
+- `bun run probe <url>` prints what a machine's status addresses answer, for fixing "not reported".
+- `bun run sweep` runs a sweep from the command line (for schedules and headless machines).
+- Optional watts per machine, for a speed-per-watt chart (the number is yours; it is not measured here).
+- Scoreboard warns when a server reused cached prompt tokens or wrote almost nothing.
+- Security: other websites cannot act through a saved password, a request size cap, a lockout after repeated wrong
+  passwords, browser security headers, and a startup warning when no password is set.
+- Update notice (never auto-update) and a README split: the inherited suite's docs moved to `docs/`.
+- Run files and the sweep CSV record the reply length, thinking setting and tool version.
+
+## 1.0.0
+
+- First release as LLM-Super-Bench, based on NetworkChuck's LLM Race harness: solo and head-to-head, selectable prompt
+  sizes and stream counts, sweeps with CSV, machine details, editable machines, reply length and thinking controls.

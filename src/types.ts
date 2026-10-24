@@ -42,6 +42,11 @@ export interface LaneConfig {
    * type it here for engines that cannot. Saved with the results so a comparison says what ran.
    */
   engine?: string;
+  /**
+   * Average watts this machine drew under load, measured by you (a wall meter, a smart plug). Used only
+   * to chart speed per watt; the tool does not measure power itself.
+   */
+  watts?: number;
 }
 
 export interface RaceConfig {

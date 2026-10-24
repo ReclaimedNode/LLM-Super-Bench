@@ -24,8 +24,15 @@
           <button class="btn" id="add-file" type="button">ADD ANOTHER RUN FILE</button>
           <button class="btn" id="download-json" type="button" disabled>DOWNLOAD THIS SERVER'S RUN (.json)</button>
           <button class="btn" id="download-csv" type="button" disabled>DOWNLOAD ALL SHOWN (.csv)</button>
+          <button class="btn" id="download-report" type="button" disabled>DOWNLOAD REPORT (.html)</button>
           <input id="file-input" type="file" accept=".json,application/json" multiple hidden />
         </div>
+        <div class="actions" id="saved-row" hidden>
+          <label class="control-name" for="saved-runs">SAVED ON THIS SERVER</label>
+          <select id="saved-runs"></select>
+          <button class="btn" id="add-saved" type="button">ADD SAVED RUN</button>
+        </div>
+        <p class="note bad" id="version-note"></p>
         <p class="note">A run file holds the numbers and how each machine was set up. It has no addresses or host names, so it is safe to send to someone. Add their file here to draw their machines beside yours.</p>
         <p class="note bad" id="problem" role="alert"></p>
       </section>

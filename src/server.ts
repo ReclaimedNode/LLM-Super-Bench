@@ -2,8 +2,9 @@
  * The one local server. Serves the page from disk and streams a race to it.
  *
  * Every asset is local: no CDN, no web font, no analytics, no telemetry. The
- * only outbound calls this process ever makes are to the lane URLs in the
- * config.
+ * outbound calls this process makes are to the lane URLs in the config, and one
+ * anonymous request a day to GitHub asking whether a newer version exists (see
+ * update.ts; LLM_SUPER_BENCH_NO_UPDATE_CHECK=1 turns it off).
  */
 
 import { mkdir, writeFile } from "node:fs/promises";
@@ -15,8 +16,10 @@ import { passwordOk } from "./auth.ts";
 import { makeUpdateChecker } from "./update.ts";
 import { MAX_REQUEST_BYTES, makeThrottle, sameOriginOk, withSecurityHeaders } from "./guard.ts";
 import { applyEdit, checkMachine, parseEditedLanes } from "./editor.ts";
-import { differences, probeDetails, setupOf } from "./details.ts";
-import type { MachineSetup } from "./details.ts";
+import { differences, probeDetails } from "./details.ts";
+import { setupFor } from "./asked.ts";
+import { listRuns, readRunText, saveRun } from "./runstore.ts";
+import { toolInfo } from "./toolinfo.ts";
 import { UNKNOWN_CAPACITY, presetFit, probeCapacity, streamLimit } from "./capacity.ts";
 import type { LaneCapacity } from "./capacity.ts";
 import { runRace } from "./race.ts";
@@ -123,40 +126,17 @@ function eventStream(
   });
 }
 
-/** Each machine's slots and reported setup, asked now, for the lanes that will run. */
-async function setupFor(
-  raceConfig: typeof config,
-  ids: string[],
-): Promise<{ slots: Record<string, number | null>; setups: Record<string, MachineSetup> }> {
-  const picked = raceConfig.lanes
-    .map((lane, i) => ({ laneId: `lane-${i}`, lane }))
-    .filter(({ laneId }) => ids.includes(laneId));
-  const found = await Promise.all(picked.map(({ lane, laneId }) => probeDetails(lane, laneId)));
-  const slots: Record<string, number | null> = {};
-  const setups: Record<string, MachineSetup> = {};
-  found.forEach((d) => {
-    slots[d.laneId] = d.slots;
-    setups[d.laneId] = setupOf(d);
-  });
-  return { slots, setups };
-}
-
 /** The latest finished race or sweep, for the results page. Also saved to results/ as it finishes. */
 let lastRun: RunFile | null = null;
 
 async function keepRun(file: RunFile): Promise<void> {
   if (!hasFinishedRun(file)) return;
   lastRun = file;
-  try {
-    const stamp = file.createdAt.replace(/[:.]/g, "-");
-    await mkdir(resolve(PROJECT_ROOT, "results"), { recursive: true });
-    await writeFile(resolve(PROJECT_ROOT, `results/run-${file.kind}-${stamp}.json`), JSON.stringify(file, null, 2) + "\n");
-  } catch {
-    /* the page still has it in memory */
-  }
+  await saveRun(file); // the page still has it in memory if this cannot write
 }
 
 const throttle = makeThrottle();
+const tool = await toolInfo();
 const updates = makeUpdateChecker();
 
 const server = Bun.serve({
@@ -308,7 +288,7 @@ async function handle(req: Request, client: string): Promise<Response> {
 
       if (url.pathname === "/api/lanes-config" && req.method === "GET") {
         return Response.json({
-          lanes: config.lanes.map((l) => ({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", engine: l.engine ?? "", slots: l.slots ?? null })),
+          lanes: config.lanes.map((l) => ({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", engine: l.engine ?? "", watts: l.watts ?? null, slots: l.slots ?? null })),
           minMachines: 1,
           maxMachines: 4,
         });
@@ -344,6 +324,22 @@ async function handle(req: Request, client: string): Promise<Response> {
     // Whether the repository has a newer version. Asked of GitHub at most once a day, and only ever told.
     if (url.pathname === "/api/update" && req.method === "GET") {
       return Response.json(await updates.status(), { headers: { "Cache-Control": "no-store" } });
+    }
+
+    // Runs saved in results/, newest first, and one of them by name. Only names that look like a saved run's are served.
+    if (url.pathname === "/api/runs" && req.method === "GET") {
+      return Response.json({ runs: await listRuns() }, { headers: { "Cache-Control": "no-store" } });
+    }
+    if (url.pathname.startsWith("/api/runs/") && req.method === "GET") {
+      let wanted = "";
+      try {
+        wanted = decodeURIComponent(url.pathname.slice("/api/runs/".length)).slice(0, 80);
+      } catch {
+        /* a broken escape is just a name that matches nothing */
+      }
+      const text = await readRunText(wanted);
+      if (text === null) return Response.json({ error: "No such saved run." }, { status: 404 });
+      return new Response(text, { headers: { "Content-Type": "application/json", "Cache-Control": "no-store" } });
     }
 
     // The latest finished race or sweep, as the file the results page draws and people can share.
@@ -409,10 +405,11 @@ async function handle(req: Request, client: string): Promise<Response> {
                 buildRunFile({
                   kind: "race",
                   rows: raceRows(preset, concurrency, event.results),
-                  lanes: raceConfig.lanes.map((l, i) => ({ laneId: `lane-${i}`, label: l.label, displayModel: l.displayModel, model: l.model })),
+                  lanes: raceConfig.lanes.map((l, i) => ({ laneId: `lane-${i}`, label: l.label, displayModel: l.displayModel, model: l.model, ...(l.watts !== undefined ? { watts: l.watts } : {}) })),
                   setups: asked.setups,
                   maxTokens: raceConfig.maxTokens,
                   thinking: raceConfig.thinking,
+                  tool,
                 }),
               );
             }
@@ -471,10 +468,11 @@ async function handle(req: Request, client: string): Promise<Response> {
               buildRunFile({
                 kind: "sweep",
                 rows: event.rows,
-                lanes: raceConfig.lanes.map((l, i) => ({ laneId: `lane-${i}`, label: l.label, displayModel: l.displayModel, model: l.model })),
+                lanes: raceConfig.lanes.map((l, i) => ({ laneId: `lane-${i}`, label: l.label, displayModel: l.displayModel, model: l.model, ...(l.watts !== undefined ? { watts: l.watts } : {}) })),
                 setups: asked.setups,
                 maxTokens: raceConfig.maxTokens,
                 thinking: raceConfig.thinking,
+                tool,
                 complete: event.complete,
               }),
             );
@@ -488,6 +486,14 @@ async function handle(req: Request, client: string): Promise<Response> {
     return new Response("not found", { status: 404 });
   }
 }
+
+const openWarning =
+  password === ""
+    ? `
+  WARNING: no password is set. Anyone on this network can start races. Changing machines is switched off.
+           Set one with:  RACE_PASSWORD='something-long' bun run race
+`
+    : "";
 
 const laneLines = config.lanes
   .map((l) => `    ${l.label.padEnd(10)} ${l.displayModel ?? l.model}`)
@@ -503,4 +509,4 @@ ${laneLines}
 
   Config: ${usedExample ? `${EXAMPLE_CONFIG_PATH}  (no race.config.json yet -- using the example, which points at the mock lanes)` : CONFIG_PATH}
   Prompt: ${config.promptFile}${sourceError ? `  [${sourceError}]` : ""}
-`);
+${openWarning}`);

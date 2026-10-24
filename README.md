@@ -396,6 +396,25 @@ The server keeps the latest finished run in memory (served at `/api/last-run`) a
 
 The original repo's charts were made differently: a small Python script (`scripts/charts.py`) wrote fixed SVG files from its `data/` folder. This page does the same kind of drawing live in your browser, from your own runs.
 
+### More ways to use the charts
+
+- **Report.** On the results page, **DOWNLOAD REPORT (.html)** saves one file with every chart and the setup table in it. It has no scripts and fetches nothing, so you can attach it, host it, or paste its charts into a post.
+- **Saved runs.** Everything that finishes is saved in `results/`. The results page lists them under **SAVED ON THIS SERVER**, so you can compare today's run with last week's without finding the file.
+- **Tool version.** Each run file records the version and commit of the tool that made it. If you load files from different versions, the page warns that timing rules may differ.
+- **Speed per watt.** Measure what a machine draws under load with a wall meter or smart plug, then enter it under **MANAGE MACHINES** (or `"watts": 320` on the machine in `race.config.json`). The charts then add a tokens-per-second-per-watt chart. The watts are your number, and the tool does not measure power. The chart needs real token counts, not streamed chunks.
+
+## Command line
+
+```bash
+bun run sweep --sizes short,4k,16k --streams 1,2,4 --repeats 3      # the page's sweep, no browser needed
+bun run sweep --machines "Mac Studio,CMP 170HX" --thinking low --max-tokens 1024
+bun run probe http://192.168.1.50:8000                              # what a machine's status addresses say
+```
+
+`bun run sweep` writes the CSV and the shareable run file to `results/`, then you open the page (or the results page) to see the charts. Options: `--sizes`, `--streams`, `--repeats`, `--machines` (by name), `--no-warmup`, `--thinking auto|low|off`, `--max-tokens`. It exits 0 when the sweep finished, so it fits a scheduled job.
+
+`bun run probe` is read-only (it only sends GET requests). Use it when MACHINE DETAILS says "not reported": the output masks addresses and home folders and is safe to paste into an issue.
+
 ## Thinking models
 
 **REPLY LENGTH** and **THINKING** at the top of the page set these for every machine, so nothing
