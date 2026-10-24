@@ -23,3 +23,9 @@ node_modules/
 __pycache__/
 *.pyc
 !prompts/on-liberty-mill.txt
+
+# Downloaded test questions (bun run quality:fetch). Large; IFEval's file is kept in git with its licence.
+quality/mmlu-pro/data.jsonl
+quality/mmlu/data.jsonl
+quality/gsm8k/data.jsonl
+quality/math500/data.jsonl

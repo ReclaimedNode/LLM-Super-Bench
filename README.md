@@ -415,6 +415,46 @@ bun run probe http://192.168.1.50:8000                              # what a mac
 
 `bun run probe` is read-only (it only sends GET requests). Use it when MACHINE DETAILS says "not reported": the output masks addresses and home folders and is safe to paste into an issue.
 
+## Are the answers right? `bun run quality`
+
+A race measures speed, not whether the answers are any good. `bun run quality` asks every machine the questions of a
+published test and scores the answers with code. No second model judges anything.
+
+| Test (`--suite`) | Measures | Questions | Source and licence |
+|---|---|---|---|
+| `ifeval` (default) | Following instructions a program can check ("no commas", "at least 300 words") | 541 | Google Research, Apache 2.0 |
+| `mmlu-pro` | Knowledge and reasoning, 10-option multiple choice, 14 subjects | 12,032 | TIGER-Lab, MIT |
+| `mmlu` | General knowledge, 4-option multiple choice, 57 subjects | 14,042 | Hendrycks et al., MIT |
+| `gsm8k` | Grade-school maths, final number checked | 1,319 | OpenAI, MIT |
+| `math500` | Competition maths, final answer checked after normalising | 500 | OpenAI / Hendrycks et al. (see its notice) |
+| `longctx` | Finding facts buried in 4K to 128K tokens: needle, multi-key, variable chain | made here | after RULER (Apache 2.0) and needle-in-a-haystack (MIT) |
+
+```bash
+bun run quality:fetch ifeval          # once per published test: downloads the questions unchanged, checks them
+bun run quality --limit 60            # IFEval, an even spread of 60 of the 541 questions
+bun run quality:fetch mmlu-pro && bun run quality --suite mmlu-pro --limit 200
+bun run quality --suite longctx --sizes 8k,32k,128k      # nothing to download
+bun run quality --machines "Mac Studio,CMP 170HX" --max-tokens 2048 --thinking off --streams 4
+```
+
+- Every machine gets the same questions, temperature 0, the same reply limit and the same thinking switch as a race.
+- **Strict** counts the answer as the test defines it ("The answer is (B)", `\boxed{}`, every rule followed). **Loose** forgives the
+  format (a bare "Answer: B", the last number in the reply, "Sure, here it is:" in front). The headline is strict.
+- A reply cut off by the reply limit, or one that is only the model's thinking, is counted separately (CUT OFF, ONLY
+  THINKING) so you can tell a model that ran out of room from one that got it wrong. Raise `--max-tokens` for a thinking model.
+- The saved `results/quality-<time>.json` holds the machine setups, settings, scores, a table by subject or by kind and size, and
+  the start of each answer. It holds no addresses.
+- The published questions are kept exactly as their authors released them, with a notice in `quality/<test>/` and a
+  SHA-256 fingerprint in `SOURCE.txt`. The checking code is ours. Questions are asked **zero-shot with one standard instruction**,
+  which is not the few-shot setup of some leaderboards, so compare your machines with each other, not to a leaderboard to the decimal.
+  IFEval's language guess and MATH-500's answer matching are rougher than the originals (an answer written in an unusual form can be
+  marked wrong). Say which test and how many questions you asked whenever you publish a score.
+- The long-context test needs a machine whose context fits the size: a prompt that does not fit comes back as an error (NO REPLY).
+- MMLU-Pro and MMLU are large; use `--limit`. The downloaded `data.jsonl` files are left out of git by default.
+
+These tests measure following instructions, knowledge, maths and finding facts in long text. They do not measure coding, tool
+use, writing quality or truthfulness, and a high score on one is not a verdict on a model.
+
 ## Thinking models
 
 **REPLY LENGTH** and **THINKING** at the top of the page set these for every machine, so nothing
@@ -648,3 +688,7 @@ the on-screen design come from that project. Thank you to NetworkChuck for build
 
 What this version adds is listed in [NOTICE.md](NOTICE.md). The original repository's data, writing and
 media are under their own licences and are not part of this one.
+
+The quality tests use **IFEval** (Google Research, Apache 2.0), **MMLU-Pro** (TIGER-Lab, MIT), **MMLU** (Hendrycks et al., MIT),
+**GSM8K** (OpenAI, MIT) and **MATH-500** (OpenAI, from Hendrycks et al.), and a long-context test modelled on **RULER** (NVIDIA,
+Apache 2.0) and needle-in-a-haystack (Kamradt, MIT). Sources, papers and licences are in each `quality/<test>/NOTICE.md`.

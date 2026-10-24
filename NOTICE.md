@@ -11,3 +11,9 @@ password option; editing the machines from the page; `bun run init`; a launchd s
 
 The measurements, writing, charts and media in the original repository (`data/`, `docs/`, `assets/`,
 `media/`, `site/`) are under their own licences and are not part of this project.
+
+Also added: `bun run quality`, which asks each machine the questions of a published test and scores the answers:
+**IFEval** (Google Research, Apache License 2.0), **MMLU-Pro** (TIGER-Lab, MIT), **MMLU** (Hendrycks et al., MIT),
+**GSM8K** (OpenAI, MIT) and **MATH-500** (OpenAI, from Hendrycks et al.'s MATH), plus a long-context test written here after
+RULER (NVIDIA, Apache-2.0) and needle-in-a-haystack (Kamradt, MIT). The questions are downloaded unchanged by
+`bun run quality:fetch`; the checking code is written for this project. Each test has a `NOTICE.md` in `quality/<test>/`.

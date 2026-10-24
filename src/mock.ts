@@ -145,6 +145,7 @@ export function startMockLane(options: MockLaneOptions): Server {
       const body = (await req.json().catch(() => ({}))) as {
         model?: string;
         max_tokens?: number;
+        stream?: boolean;
         stream_options?: { include_usage?: boolean };
         messages?: { role?: string; content?: string }[];
       };
@@ -169,6 +170,18 @@ export function startMockLane(options: MockLaneOptions): Server {
       const promptChars = (body.messages ?? []).reduce((n, m) => n + (m.content?.length ?? 0), 0);
       const promptTokens = Math.max(1, Math.round(promptChars / charsPerToken));
       const firstWordDelayMs = options.firstWordDelayMs + (perKChar * promptChars) / 1000;
+
+      // `stream: false` gets one JSON reply, like a real endpoint, so the quality test can run on the mock.
+      if (body.stream === false) {
+        await sleep(firstWordDelayMs);
+        const text = options.thinkOnly ? "" : Array.from({ length: maxChunks }, (_, i) => WORDS[i % WORDS.length]!).join(" ");
+        return Response.json({
+          id: "chatcmpl-mock",
+          object: "chat.completion",
+          model,
+          choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: maxChunks < options.chunks ? "length" : "stop" }],
+        });
+      }
 
       const stream = new ReadableStream<Uint8Array>({
         async start(controller) {

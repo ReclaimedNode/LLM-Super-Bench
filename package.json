@@ -23,6 +23,8 @@
     "test": "bun test",
     "init": "bun run src/init.ts",
     "probe": "bun run src/probecli.ts",
-    "sweep": "bun run src/sweepcli.ts"
+    "sweep": "bun run src/sweepcli.ts",
+    "quality": "bun run src/quality/cli.ts",
+    "quality:fetch": "bun run src/quality/fetch.ts"
   }
 }

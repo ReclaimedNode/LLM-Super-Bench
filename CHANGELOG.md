@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- `bun run quality` asks every machine the questions of a published test and scores whether the answers are right.
+  Tests: IFEval (instructions, 541 questions), MMLU-Pro and MMLU (knowledge), GSM8K and MATH-500 (maths), and a long-context
+  test (needle, multi-key, variable chain) made here. `bun run quality:fetch <test>` downloads the questions unchanged,
+  checks them and records a fingerprint. Strict and loose scores, results by subject or by kind and size, cut-off and
+  thinking-only replies counted separately, saved to `results/quality-<time>.json`. See `quality/<test>/NOTICE.md` for sources and licences.
+- The mock server answers `stream: false` requests.
+
 ## 1.1.0
 
 - Fixed: the differences listed under Machine details were dark text on a dark panel and hard to read. They are now light.
