@@ -34,6 +34,7 @@ const el = {
   sweepNote: document.getElementById("sweep-note"),
   sweepStart: document.getElementById("sweep-start"),
   resultsBar: document.getElementById("resultsbar"),
+  updateBar: document.getElementById("updatebar"),
   sweepCsv: document.getElementById("sweep-csv"),
   sweepTableWrap: document.getElementById("sweep-table-wrap"),
   sweepHead: document.getElementById("sweep-head"),
@@ -856,6 +857,7 @@ function onEvent(event) {
   switch (event.type) {
     case "race-start": {
       el.resultsBar.hidden = true;
+      el.updateBar.hidden = true;
       const chars = event.promptChars.toLocaleString("en-US");
       const who = event.lanes.length > 1
         ? `head to head, ${event.lanes.map((l) => l.label).join(" vs ")}`
@@ -1274,6 +1276,19 @@ function downloadSweepCsv() {
 
 // ------------------------------------------------------------------ boot
 
+/** Tells, never updates. A failed or switched-off check shows nothing. */
+async function showUpdateNotice() {
+  try {
+    const status = await (await fetch("/api/update")).json();
+    if (status.available !== true || racing) return;
+    const n = Number.isInteger(status.behind) && status.behind > 0 ? status.behind : null;
+    el.updateBar.textContent = `A newer version is available${n ? ` (${n} change${n === 1 ? "" : "s"})` : ""}. On the machine that runs this page: git pull, then restart it. Nothing was changed.`;
+    el.updateBar.hidden = false;
+  } catch {
+    /* no internet, or not a git clone: say nothing */
+  }
+}
+
 async function boot() {
   const response = await fetch("/api/config");
   const config = await response.json();
@@ -1309,6 +1324,7 @@ async function boot() {
   el.sweepCsv.addEventListener("click", downloadSweepCsv);
   // Not awaited: a machine that is down must not hold the page up.
   refreshCapacity();
+  showUpdateNotice();
 
   logLine(
     `${config.lanes.length} lanes loaded. Replies are capped at ${config.maxTokens} tokens. Prompt source: ${config.promptFile}.`,

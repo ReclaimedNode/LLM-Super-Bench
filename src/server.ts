@@ -12,6 +12,7 @@ import { CONFIG_PATH, EXAMPLE_CONFIG_PATH, PROJECT_ROOT, loadConfig, loadPromptS
 import { readLanesState, withServedModels } from "./lanes.ts";
 import { PRESETS, PRESET_IDS, targetCharsFor } from "./prompt.ts";
 import { passwordOk } from "./auth.ts";
+import { makeUpdateChecker } from "./update.ts";
 import { MAX_REQUEST_BYTES, makeThrottle, sameOriginOk, withSecurityHeaders } from "./guard.ts";
 import { applyEdit, checkMachine, parseEditedLanes } from "./editor.ts";
 import { differences, probeDetails, setupOf } from "./details.ts";
@@ -156,6 +157,7 @@ async function keepRun(file: RunFile): Promise<void> {
 }
 
 const throttle = makeThrottle();
+const updates = makeUpdateChecker();
 
 const server = Bun.serve({
   port: config.port,
@@ -337,6 +339,11 @@ async function handle(req: Request, client: string): Promise<Response> {
           raceInFlight = false;
         }
       }
+    }
+
+    // Whether the repository has a newer version. Asked of GitHub at most once a day, and only ever told.
+    if (url.pathname === "/api/update" && req.method === "GET") {
+      return Response.json(await updates.status(), { headers: { "Cache-Control": "no-store" } });
     }
 
     // The latest finished race or sweep, as the file the results page draws and people can share.

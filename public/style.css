@@ -712,3 +712,6 @@ main {
 .resultsbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border: 2px solid var(--edge, #34363a); }
 .resultsbar[hidden] { display: none; }
 .resultsbar a.start { text-decoration: none; display: inline-block; }
+
+.updatebar { padding: 10px 20px; border: 2px solid var(--nc-gold, #f1a21a); font-size: clamp(0.8rem, 0.95vw, 1.05rem); }
+.updatebar[hidden] { display: none; }

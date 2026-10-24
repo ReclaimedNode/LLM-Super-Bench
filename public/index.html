@@ -49,6 +49,9 @@
       <button class="start stop" id="stop" type="button" hidden>STOP</button>
     </header>
 
+    <!-- Shown only when the repository has a newer version, and never during a race. Telling, not updating. -->
+    <div class="updatebar" id="updatebar" hidden role="status"></div>
+
     <!-- Appears after a race or sweep finishes: the graphs open in a new tab, and the numbers can be saved to share. -->
     <div class="resultsbar" id="resultsbar" hidden>
       <span class="control-name">RESULTS</span>
