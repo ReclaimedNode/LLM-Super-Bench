@@ -2,6 +2,8 @@
 
 ## 1.1.0
 
+- Fixed: the differences listed under Machine details were dark text on a dark panel and hard to read. They are now light.
+
 - Charts page (`/results.html`) with bar and line charts, SVG and PNG export, a CSV of everything shown, and a
   self-contained HTML report you can post or send. Saved runs on the server can be added from a list.
 - Run files (`.json`) you can share and load beside your own. They carry no addresses.

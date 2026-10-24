@@ -533,6 +533,11 @@ main {
   overflow-wrap: anywhere;
 }
 
+/* The scoreboard is light; the machine-details panel is dark, so its notes need light text. */
+.machines-panel .notes li {
+  color: var(--nc-cream);
+}
+
 /* ---------------------------------------------------------------- log */
 
 .logbar {
