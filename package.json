@@ -25,6 +25,7 @@
     "probe": "bun run src/probecli.ts",
     "sweep": "bun run src/sweepcli.ts",
     "quality": "bun run src/quality/cli.ts",
-    "quality:fetch": "bun run src/quality/fetch.ts"
+    "quality:fetch": "bun run src/quality/fetch.ts",
+    "update": "bun run src/updatecli.ts"
   }
 }
