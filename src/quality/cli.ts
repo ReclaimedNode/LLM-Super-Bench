@@ -163,6 +163,16 @@ export function formatTable(file: QualityFile): string {
   return rows.map((r) => r.map((cell, c) => cell.padEnd(widths[c]!)).join("  ")).join("\n");
 }
 
+/** One line per machine that will be asked: its name, model and engine. Never its address. */
+export function describeMachines(lanes: { label: string; model: string; displayModel?: string }[], setups: Record<string, MachineSetup>, ids: string[]): string[] {
+  return ids.map((id) => {
+    const lane = lanes[Number(id.replace("lane-", ""))]!;
+    const setup = setups[id];
+    const parts = [baseName(lane.displayModel ?? lane.model), setup?.engine ?? "engine not reported", setup?.quant ?? null].filter((x): x is string => !!x);
+    return `  ${lane.label}: ${parts.join(", ")}`;
+  });
+}
+
 /** How each kind of question went, one row per kind, one column per machine. Empty for IFEval, which has 25 kinds. */
 export function formatGroups(file: QualityFile): string {
   if (file.benchmark.id === "ifeval") return "";
@@ -202,6 +212,7 @@ async function main(): Promise<number> {
   const served = withServedModels(config, await readLanesState());
   const asked = await setupFor(served, picked.ids);
   const thinking = config.thinking ?? "auto";
+  console.log("Machines:\n" + describeMachines(served.lanes, asked.setups, picked.ids).join("\n"));
   console.log(`Asking ${picked.ids.length} machine(s) ${questions.length} ${suite.name} question(s), ${args.streams} at a time each. Reply limit ${args.maxTokens} tokens, thinking ${thinking}.`);
   const results = await runQuality({
     lanes: picked.ids.map((laneId) => {
