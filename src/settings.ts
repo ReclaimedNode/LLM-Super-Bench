@@ -57,9 +57,9 @@ export function extraBodyFor(
 ): Record<string, unknown> | undefined {
   if (thinking !== "off" && thinking !== "low") return lane.extraBody;
   const own = lane.extraBody ?? {};
-  // Ollama's OpenAI-compatible endpoint takes a plain `reasoning_effort` ("none" turns thinking off)
-  // and does not read chat_template_kwargs. A machine's own extraBody still wins.
-  if (engine && /ollama/i.test(engine)) {
+  // Ollama's and Strata's OpenAI-compatible endpoints take a plain `reasoning_effort` ("none" turns
+  // thinking off) and do not read chat_template_kwargs. A machine's own extraBody still wins.
+  if (engine && /ollama|strata/i.test(engine)) {
     return { reasoning_effort: thinking === "off" ? "none" : "low", ...own };
   }
   const kwargs = typeof own.chat_template_kwargs === "object" && own.chat_template_kwargs !== null

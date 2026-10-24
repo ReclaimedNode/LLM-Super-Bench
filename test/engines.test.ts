@@ -42,6 +42,13 @@ describe("engine detection", () => {
     expect(readDetails(lane, "a", { props: null, slots: null, models: models("m", { owned_by: "tensorrt_llm" }) }).engine).toBe("TensorRT-LLM");
   });
 
+  test("Strata is told apart from other servers that answer /health", () => {
+    const d = readDetails(lane, "a", { props: null, slots: null, models: models("any"), extra: { strata: { status: "ok", model: "/m/Qwen3.8-Flash-Next-Q4.gguf", max_context: 65536, images: true, api_key: true, loaded: true } } });
+    expect([d.engine, d.modelFile, d.contextPerSlot, d.vision]).toEqual(["Strata", "Qwen3.8-Flash-Next-Q4.gguf", 65536, true]);
+    // llama-server's and vLLM's /health say nothing like that.
+    expect(readDetails(lane, "a", { props: null, slots: null, models: models("m"), extra: { strata: { status: "ok" } } }).engine).toBeNull();
+  });
+
   test("an unknown server stays unnamed, and a typed engine wins", () => {
     expect(readDetails(lane, "a", { props: null, slots: null, models: models("m") }).engine).toBeNull();
     const typed = { ...lane, engine: "TensorFold" } as never;
@@ -58,7 +65,7 @@ describe("engine detection", () => {
     }) as never;
     const d = await probeDetails({ label: "X", baseUrl: "http://h:1", model: "m" } as never, "a", { fetchImpl });
     expect(d.engine).toBe("Ollama");
-    for (const p of ["/api/version", "/api/v0/models", "/get_server_info", "/info", "/api/extra/version"]) expect(seen).toContain(p);
+    for (const p of ["/api/version", "/api/v0/models", "/get_server_info", "/info", "/api/extra/version", "/health"]) expect(seen).toContain(p);
   });
 });
 
@@ -78,6 +85,7 @@ describe("thinking switch per engine", () => {
   test("Ollama gets reasoning_effort, others keep chat_template_kwargs, own extraBody wins", () => {
     expect(extraBodyFor({}, "off", "Ollama")).toEqual({ reasoning_effort: "none" });
     expect(extraBodyFor({}, "low", "Ollama")).toEqual({ reasoning_effort: "low" });
+    expect(extraBodyFor({}, "off", "Strata")).toEqual({ reasoning_effort: "none" });
     expect(extraBodyFor({}, "off", "vLLM")).toEqual({ chat_template_kwargs: { enable_thinking: false } });
     expect(extraBodyFor({ extraBody: { reasoning_effort: "high" } }, "off", "Ollama")).toEqual({ reasoning_effort: "high" });
   });

@@ -434,13 +434,16 @@ Any server with an OpenAI-compatible streaming endpoint can be raced. The machin
 | SGLang | `/get_server_info` | version, model, quant, max running requests, context |
 | KoboldCpp | `/api/extra/version` | version |
 | TGI | `/info` | version, model, max concurrent requests, context |
+| Strata | `/health` (`max_context`, `loaded`) | model, context, image support |
 | TensorRT-LLM | `/v1/models` (`owned_by`) | name only |
 
 Those endpoints were written from each engine's documentation, not tested against every version, so treat a "not reported" as "this server did not say", and open an issue with the output of that engine's status address if one is wrong.
 
+Strata listens on `127.0.0.1` by default. To race it from another computer, start it with `--host 0.0.0.0 --api-key <secret>` and put the same key as `"apiKey"` on its lane in `race.config.json`.
+
 A server that is not on the list (TensorFold, MLX-LM, LocalAI and others) still races. Type its name into **Engine** under MANAGE MACHINES, or set `"engine": "TensorFold"` on its lane in `race.config.json`; a typed name always wins over a detected one. Use **Notes** for how it was started.
 
-THINKING LOW and OFF send each engine the switch it reads: `chat_template_kwargs` for most, `reasoning_effort` for Ollama. A lane's own `extraBody` always wins, so any engine's own switch can be set there.
+THINKING LOW and OFF send each engine the switch it reads: `chat_template_kwargs` for most, `reasoning_effort` for Ollama and Strata. A lane's own `extraBody` always wins, so any engine's own switch can be set there.
 
 ### Fair comparison
 

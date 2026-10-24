@@ -139,6 +139,8 @@ export interface ExtraAnswers {
   kobold?: unknown | null;
   /** Text Generation Inference: GET /info. */
   tgi?: unknown | null;
+  /** Strata: GET /health, which answers with JSON naming the model and `max_context`. */
+  strata?: unknown | null;
 }
 
 interface EngineReading {
@@ -148,6 +150,7 @@ interface EngineReading {
   quant: string | null;
   slots: number | null;
   context: number | null;
+  vision?: boolean | null;
 }
 
 const NO_ENGINE: EngineReading = { engine: null, build: null, modelFile: null, quant: null, slots: null, context: null };
@@ -202,6 +205,21 @@ export function readEngine(modelId: string | null, first: Record<string, unknown
       quant: str(sglang?.quantization)?.toUpperCase() ?? null,
       slots: num(sglang?.max_running_requests),
       context: num(sglang?.context_length),
+    };
+  }
+
+  // Other servers answer /health too (llama-server, vLLM), but only Strata's says `max_context` and `loaded`.
+  const strata = obj(extra.strata);
+  if (strata !== null && num(strata.max_context) !== null && typeof strata.loaded === "boolean") {
+    const model = str(strata.model);
+    return {
+      engine: "Strata",
+      build: null,
+      modelFile: model ? baseName(model) : null,
+      quant: null,
+      slots: null,
+      context: num(strata.max_context),
+      vision: typeof strata.images === "boolean" ? strata.images : null,
     };
   }
 
@@ -293,7 +311,7 @@ export function readDetails(
     slotsSource: capacity.slots === null && (metricSlots !== null || other.slots !== null) ? "server" : capacity.source,
     contextPerSlot: contextPerSlot ?? other.context,
     slotContexts: slotContexts && slotContexts.length > 0 ? slotContexts : null,
-    vision,
+    vision: vision ?? other.vision ?? null,
     notes: lane.notes ?? null,
     // llama-server lists the model by its full path; the folder stays off the page.
     modelId: str(first?.id) ? baseName(str(first?.id)!) : null,
@@ -318,8 +336,8 @@ export async function probeDetails(lane: LaneConfig, laneId: string, opts: Detai
   if (props === null) {
     // Every other engine has its own status address; each that is not there just answers 404.
     const ask = (path: string) => getJson(lane, path, timeoutMs, fetchImpl);
-    let ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi;
-    [version, metrics, ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi] = await Promise.all([
+    let ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, strata;
+    [version, metrics, ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, strata] = await Promise.all([
       ask("/version"),
       getText(lane, "/metrics", timeoutMs, fetchImpl),
       ask("/api/version"),
@@ -329,8 +347,9 @@ export async function probeDetails(lane: LaneConfig, laneId: string, opts: Detai
       ask("/get_server_info"),
       ask("/api/extra/version"),
       ask("/info"),
+      ask("/health"),
     ]);
-    Object.assign(extra, { ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi });
+    Object.assign(extra, { ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, strata });
   }
   return readDetails(lane, laneId, { props, slots, models, version, metrics, extra });
 }
