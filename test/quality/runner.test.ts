@@ -130,3 +130,17 @@ describe("against the mock server", () => {
     }
   });
 });
+
+describe("naming the machines before a run", () => {
+  test("each line has the name, model and engine, and never an address", async () => {
+    const { describeMachines } = await import("../../src/quality/cli.ts");
+    const lanes = [
+      { label: "Mac Studio", baseUrl: "http://192.168.10.220:8000", model: "/Users/me/models/Qwen-27B-Q8_0.gguf" },
+      { label: "Box", baseUrl: "http://10.0.0.4:8000", model: "m", displayModel: "Big" },
+    ] as any[];
+    const setups = { "lane-0": { engine: "llama.cpp", quant: "Q8_0" } } as any;
+    const lines = describeMachines(lanes, setups, ["lane-0", "lane-1"]);
+    expect(lines).toEqual(["  Mac Studio: Qwen-27B-Q8_0.gguf, llama.cpp, Q8_0", "  Box: Big, engine not reported"]);
+    expect(lines.join("")).not.toContain("192.168");
+  });
+});
