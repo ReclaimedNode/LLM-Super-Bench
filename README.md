@@ -482,6 +482,19 @@ the lane. For llama-server with a Qwen-style template that is
 lane so the machines still get the same request. `extraBody` cannot set the model, messages,
 streaming, token cap or temperature.
 
+## Security
+
+What the page protects against, and what it does not.
+
+- **Keep it on a trusted network.** The password is HTTP Basic over plain HTTP, so it crosses the network unencrypted. Use a home LAN or a private network such as Tailscale. Do not open the port to the internet. If you must reach it from outside, put it behind a reverse proxy that adds HTTPS.
+- **Set `RACE_PASSWORD`.** Without it anyone on the network can start races. Changing machines or settings from the page is refused without one.
+- **Other websites cannot act for you.** Any request that changes something must come from this page itself. A request from another site in your browser is refused, even with your password saved.
+- **Password guessing is slowed.** After 10 wrong passwords an address is locked out for 5 minutes.
+- **Small requests only.** Anything over 64 KB is refused, and every page carries headers that stop framing, sniffing and scripts from anywhere but this server.
+- **No addresses leave the machine in the data you share.** Run files and the results page carry no host names, addresses or folders, and files you load are checked and escaped before they are drawn.
+- **Config stays private.** `race.config.json` (addresses, API keys) is never committed.
+- **Not covered:** the extra pages (`bun run show`, `board`, `power`) are read-only but have no password. Run them only on a trusted network.
+
 ## Hosting and the password
 
 Set `RACE_PASSWORD` (or `"password"` in `race.config.json`; the environment wins) and every request

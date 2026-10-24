@@ -12,6 +12,7 @@ import { CONFIG_PATH, EXAMPLE_CONFIG_PATH, PROJECT_ROOT, loadConfig, loadPromptS
 import { readLanesState, withServedModels } from "./lanes.ts";
 import { PRESETS, PRESET_IDS, targetCharsFor } from "./prompt.ts";
 import { passwordOk } from "./auth.ts";
+import { MAX_REQUEST_BYTES, makeThrottle, sameOriginOk, withSecurityHeaders } from "./guard.ts";
 import { applyEdit, checkMachine, parseEditedLanes } from "./editor.ts";
 import { differences, probeDetails, setupOf } from "./details.ts";
 import type { MachineSetup } from "./details.ts";
@@ -21,7 +22,7 @@ import { runRace } from "./race.ts";
 import { parseRaceRequest } from "./request.ts";
 import { concurrencyOptions } from "./streams.ts";
 import { REPLY_LENGTHS, applySettings, parseSettings } from "./settings.ts";
-import { RUN_FORMAT, buildRunFile, hasFinishedRun, raceRows } from "./runfile.ts";
+import { buildRunFile, hasFinishedRun, raceRows } from "./runfile.ts";
 import type { RunFile } from "./runfile.ts";
 import { parseSweepRequest, runSweep } from "./sweep.ts";
 import type { SweepEvent } from "./sweep.ts";
@@ -154,18 +155,39 @@ async function keepRun(file: RunFile): Promise<void> {
   }
 }
 
+const throttle = makeThrottle();
+
 const server = Bun.serve({
   port: config.port,
   idleTimeout: 255, // seconds; a 32K race on slow hardware outlives the default
-  async fetch(req) {
+  maxRequestBodySize: MAX_REQUEST_BYTES,
+  async fetch(req, srv) {
+    return withSecurityHeaders(await handle(req, srv.requestIP(req)?.address ?? "unknown"));
+  },
+});
+
+async function handle(req: Request, client: string): Promise<Response> {
+  {
     const url = new URL(req.url);
 
+    // Another website must not be able to act through the visitor's saved password.
+    if (!sameOriginOk(req.method, req.headers)) {
+      return Response.json({ error: "This request came from another site, so it was refused." }, { status: 403 });
+    }
+
+    const wait = throttle.waitSec(client);
+    if (wait > 0) {
+      return new Response(`Too many wrong passwords. Try again in ${wait} seconds.`, { status: 429, headers: { "Retry-After": String(wait) } });
+    }
     if (!passwordOk(req.headers.get("authorization"), password)) {
+      // Asking for the password (no header yet) is normal; only a wrong one counts.
+      if (req.headers.get("authorization")) throttle.failed(client);
       return new Response("This page needs the password.", {
         status: 401,
         headers: { "WWW-Authenticate": 'Basic realm="LLM-Super-Bench", charset="UTF-8"' },
       });
     }
+    if (password !== "") throttle.passed(client);
 
     const stat = STATIC_FILES[url.pathname];
     if (stat && req.method === "GET") {
@@ -457,8 +479,8 @@ const server = Bun.serve({
     }
 
     return new Response("not found", { status: 404 });
-  },
-});
+  }
+}
 
 const laneLines = config.lanes
   .map((l) => `    ${l.label.padEnd(10)} ${l.displayModel ?? l.model}`)

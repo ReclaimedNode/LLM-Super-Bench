@@ -56,17 +56,6 @@ export interface MachineDetails extends MachineSetup {
   reachable: boolean;
 }
 
-export const EMPTY_SETUP: MachineSetup = {
-  engine: null,
-  modelFile: null,
-  quant: null,
-  build: null,
-  slots: null,
-  contextPerSlot: null,
-  vision: null,
-  notes: null,
-};
-
 // GGUF names (Q8_0, F16 ...) and the usual vLLM ones (AWQ, GPTQ, FP8 ...).
 const QUANT = /(?:^|[-_.])((?:IQ|Q)\d(?:_[A-Z0-9]+)*|F16|F32|BF16|AWQ|GPTQ|NVFP4|MXFP4|FP8|FP4|INT4|INT8|W4A16|W8A8)(?=[-_.]|$)/i;
 
