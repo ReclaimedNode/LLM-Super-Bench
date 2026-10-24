@@ -457,6 +457,11 @@ bun run quality --suite longctx --sizes 8k,32k,128k      # nothing to download
 bun run quality --machines "Mac Studio,CMP 170HX" --max-tokens 2048 --thinking off --streams 4
 ```
 
+Downloads work without an account. If Hugging Face slows you down (HTTP 429), make a free read-only token at
+huggingface.co/settings/tokens and run `HF_TOKEN=hf_yourtoken bun run quality:fetch all`. The token is only sent to
+Hugging Face's row service and is never saved or printed. To keep it out of your command history, `export HF_TOKEN=...`
+in your shell profile instead.
+
 - Every machine gets the same questions, temperature 0, the same reply limit and the same thinking switch as a race.
 - **Strict** counts the answer as the test defines it ("The answer is (B)", `\boxed{}`, every rule followed). **Loose** forgives the
   format (a bare "Answer: B", the last number in the reply, "Sure, here it is:" in front). The headline is strict.

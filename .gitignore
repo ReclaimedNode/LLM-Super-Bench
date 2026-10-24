@@ -29,3 +29,4 @@ quality/mmlu-pro/data.jsonl
 quality/mmlu/data.jsonl
 quality/gsm8k/data.jsonl
 quality/math500/data.jsonl
+quality/*/SOURCE.txt

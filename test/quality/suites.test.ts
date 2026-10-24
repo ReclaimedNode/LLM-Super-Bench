@@ -228,3 +228,12 @@ describe("the downloader", () => {
     await expect(downloadHf({ dataset: "d", config: "c", split: "s" }, f, async () => {})).rejects.toThrow("failed");
   });
 });
+
+describe("hfHeaders", () => {
+  test("sends a bearer token only when HF_TOKEN is set", async () => {
+    const { hfHeaders } = await import("../../src/quality/fetch.ts");
+    expect(hfHeaders({})).toEqual({});
+    expect(hfHeaders({ HF_TOKEN: "  " })).toEqual({});
+    expect(hfHeaders({ HF_TOKEN: " hf_abc " })).toEqual({ authorization: "Bearer hf_abc" });
+  });
+});

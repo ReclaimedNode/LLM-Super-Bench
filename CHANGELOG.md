@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `quality:fetch` downloads more gently and can use an optional `HF_TOKEN` (free Hugging Face token) when Hugging Face limits downloads.
 - `bun run quality` asks every machine the questions of a published test and scores whether the answers are right.
   Tests: IFEval (instructions, 541 questions), MMLU-Pro and MMLU (knowledge), GSM8K and MATH-500 (maths), and a long-context
   test (needle, multi-key, variable chain) made here. `bun run quality:fetch <test>` downloads the questions unchanged,
