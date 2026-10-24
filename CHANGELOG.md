@@ -8,6 +8,8 @@
   checks them and records a fingerprint. Strict and loose scores, results by subject or by kind and size, cut-off and
   thinking-only replies counted separately, saved to `results/quality-<time>.json`. See `quality/<test>/NOTICE.md` for sources and licences.
 - The mock server answers `stream: false` requests.
+- `bun run update`: a safe `git pull` that explains itself. It takes what is new, and when you and GitHub both have changes it says so, changes nothing and offers `--merge`, which undoes itself if the two clash. The update banner now points to it. See README, Updating.
+- `bun run quality` prints each machine's name, model and engine (never its address) before it starts.
 
 ## 1.1.0
 

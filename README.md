@@ -31,6 +31,26 @@ no number appears under a name it has not earned.
 
 Run a model that thinks before it answers? Read [Thinking models](#thinking-models) first, or the reply may look empty.
 
+## Updating
+
+On the machine that runs it:
+
+```bash
+cd ~/LLM-Super-Bench
+bun run update
+```
+
+then restart the server. `bun run update` is a safe `git pull`: it lists what is new, takes it, and tells you in plain words if it cannot.
+It changes nothing it was not asked to, and it never leaves you at a Git prompt.
+
+- **"You and GitHub each have changes the other does not"** means you committed inside this folder (for example the downloaded IFEval
+  questions) while GitHub also moved on. Nothing was changed. Run `bun run update --merge` to keep both; if your changes clash with
+  the new ones it undoes itself and names the files. Send your own commits to GitHub afterwards with `git push`, or leave them local.
+- **Files you edited but did not commit** are kept. If they clash with the update it stops and changes nothing; copy them aside,
+  update, and put them back. Your `race.config.json` is never touched, because it is not tracked by Git.
+- **A zip download** cannot update itself: download the new version and copy your `race.config.json` into it.
+- Plain `git pull` also works. If Git says "divergent branches", you are in the first case: use `git pull --no-rebase` to keep both.
+
 ## Quick start (a headless Mac Mini and your machines)
 
 You need [Bun](https://bun.sh) and nothing else. No `bun install`: there are no dependencies.
@@ -484,7 +504,7 @@ What the page protects against, and what it does not.
 - **Small requests only.** Anything over 64 KB is refused, and every page carries headers that stop framing, sniffing and scripts from anywhere but this server.
 - **No addresses leave the machine in the data you share.** Run files and the results page carry no host names, addresses or folders, and files you load are checked and escaped before they are drawn.
 - **Config stays private.** `race.config.json` (addresses, API keys) is never committed.
-- **Update notice, not auto-update.** The page asks GitHub (one anonymous request, at most once a day) whether this repository has a newer version, and shows a banner if so. It never pulls or installs anything; you run `git pull` and restart yourself. It sends only the repository name and the commit you are on. Turn it off with `LLM_SUPER_BENCH_NO_UPDATE_CHECK=1`. It stays silent for a zip download, with no internet, or if GitHub does not answer.
+- **Update notice, not auto-update.** The page asks GitHub (one anonymous request, at most once a day) whether this repository has a newer version, and shows a banner if so. It never pulls or installs anything; you run `bun run update` (see [Updating](#updating)) and restart yourself. It sends only the repository name and the commit you are on. Turn it off with `LLM_SUPER_BENCH_NO_UPDATE_CHECK=1`. It stays silent for a zip download, with no internet, or if GitHub does not answer.
 - **Not covered:** the extra pages (`bun run show`, `board`, `power`) are read-only but have no password. Run them only on a trusted network.
 
 ## Hosting and the password

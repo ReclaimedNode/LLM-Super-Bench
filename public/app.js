@@ -1284,7 +1284,7 @@ async function showUpdateNotice() {
     const status = await (await fetch("/api/update")).json();
     if (status.available !== true || racing) return;
     const n = Number.isInteger(status.behind) && status.behind > 0 ? status.behind : null;
-    el.updateBar.textContent = `A newer version is available${n ? ` (${n} change${n === 1 ? "" : "s"})` : ""}. On the machine that runs this page: git pull, then restart it. Nothing was changed.`;
+    el.updateBar.textContent = `A newer version is available${n ? ` (${n} change${n === 1 ? "" : "s"})` : ""}. On the machine that runs this page, run: bun run update, then restart it. Nothing was changed.`;
     el.updateBar.hidden = false;
   } catch {
     /* no internet, or not a git clone: say nothing */
