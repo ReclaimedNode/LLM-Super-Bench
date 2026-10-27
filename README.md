@@ -129,7 +129,8 @@ cp race.config.example.json race.config.json
 {
   "port": 9500,
   "maxTokens": 512,        // cap on each reply, so a race cannot run forever
-  "temperature": 0,
+  "temperature": 0,        // sent to every machine; 0 is greedy, the fair setting for a speed race
+  // "topP": 0.95, "topK": 20,   // optional; sent only when set. Set both whenever temperature is above 0
   "charsPerToken": 4,      // how the 8K / 32K presets convert tokens to characters
   "promptFile": "prompts/sample.txt",
   "requestTimeoutMs": 180000,
@@ -431,7 +432,7 @@ bun run sweep --machines "Mac Studio,CMP 170HX" --thinking low --max-tokens 1024
 bun run probe http://192.168.1.50:8000                              # what a machine's status addresses say
 ```
 
-`bun run sweep` writes the CSV and the shareable run file to `results/`, then you open the page (or the results page) to see the charts. Options: `--sizes`, `--streams`, `--repeats`, `--machines` (by name), `--no-warmup`, `--thinking auto|low|off`, `--max-tokens`. It exits 0 when the sweep finished, so it fits a scheduled job.
+`bun run sweep` writes the CSV and the shareable run file to `results/`, then you open the page (or the results page) to see the charts. Options: `--sizes`, `--streams`, `--repeats`, `--machines` (by name), `--no-warmup`, `--thinking auto|low|off`, `--max-tokens`, and `--temperature` / `--top-p` / `--top-k` for that sweep only (see Sampling). It exits 0 when the sweep finished, so it fits a scheduled job.
 
 `bun run probe` is read-only (it only sends GET requests). Use it when MACHINE DETAILS says "not reported": the output masks addresses and home folders and is safe to paste into an issue.
 
@@ -496,7 +497,22 @@ To measure the prompt and the answer cleanly, switch thinking off for the race w
 the lane. For llama-server with a Qwen-style template that is
 `"extraBody": {"chat_template_kwargs": {"enable_thinking": false}}`. Put the same setting on every
 lane so the machines still get the same request. `extraBody` cannot set the model, messages,
-streaming, token cap or temperature.
+streaming, token cap or sampling (temperature, top_p, top_k).
+
+### Sampling
+
+Every request carries the race's `temperature`, 0 by default. At 0 every machine picks its most likely
+word, which is the fair setting for a speed race: speculative decoding accepts more drafted words when
+the output is predictable, so a different temperature can change speed as well as wording.
+
+Change it with TEMPERATURE on the page, `"temperature"` in `race.config.json`, or for one sweep only
+with `bun run sweep --temperature 0.7 --top-p 0.95 --top-k 20` (`--top-p none` leaves that setting to
+each server). `top_p` and `top_k` are sent only when set. Above temperature 0, set both: a server left
+to choose uses its own default (vLLM reads the model's `generation_config.json`, llama.cpp has its
+own), so two machines would sample differently. The page and the sweep warn when that would happen.
+
+The sampling is saved in every run file and CSV and shown in the results page's setup table, and the
+results page says when the files you loaded were sampled differently.
 
 ## Security
 

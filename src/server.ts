@@ -25,7 +25,7 @@ import type { LaneCapacity } from "./capacity.ts";
 import { runRace } from "./race.ts";
 import { parseRaceRequest } from "./request.ts";
 import { concurrencyOptions } from "./streams.ts";
-import { REPLY_LENGTHS, applySettings, parseSettings } from "./settings.ts";
+import { REPLY_LENGTHS, TEMPERATURES, applySettings, parseSettings, samplingOf, samplingWarning } from "./settings.ts";
 import { buildRunFile, hasFinishedRun, raceRows } from "./runfile.ts";
 import type { RunFile } from "./runfile.ts";
 import { parseSweepRequest, runSweep } from "./sweep.ts";
@@ -204,6 +204,10 @@ async function handle(req: Request, client: string): Promise<Response> {
         maxTokens: config.maxTokens,
         thinking: config.thinking ?? "auto",
         replyLengths: REPLY_LENGTHS,
+        // How every machine is asked to sample, and the temperature buttons.
+        ...samplingOf(config),
+        temperatures: TEMPERATURES,
+        samplingWarning: samplingWarning(samplingOf(config)),
         charsPerToken: config.charsPerToken,
         promptFile: config.promptFile,
         usingExampleConfig: usedExample,
@@ -257,7 +261,7 @@ async function handle(req: Request, client: string): Promise<Response> {
       return Response.json({ ok: true });
     }
 
-    // ---- reply length and thinking, for every machine (needs the password)
+    // ---- reply length, thinking and sampling, for every machine (needs the password)
     if (url.pathname === "/api/settings" && req.method === "POST") {
       if (password === "") {
         return Response.json(
@@ -274,7 +278,14 @@ async function handle(req: Request, client: string): Promise<Response> {
       const result = await applySettings({ config, change: parsed.change, writePath: usedExample ? undefined : CONFIG_PATH });
       if (!result.ok) return Response.json({ error: result.error }, { status: 400 });
       config = result.config;
-      return Response.json({ ok: true, maxTokens: config.maxTokens, thinking: config.thinking ?? "auto", saved: !usedExample });
+      return Response.json({
+        ok: true,
+        maxTokens: config.maxTokens,
+        thinking: config.thinking ?? "auto",
+        ...samplingOf(config),
+        samplingWarning: samplingWarning(samplingOf(config)),
+        saved: !usedExample,
+      });
     }
 
     // ---- changing which machines are tested (needs the password)
@@ -409,6 +420,7 @@ async function handle(req: Request, client: string): Promise<Response> {
                   setups: asked.setups,
                   maxTokens: raceConfig.maxTokens,
                   thinking: raceConfig.thinking,
+                  sampling: samplingOf(raceConfig),
                   tool,
                 }),
               );
@@ -472,6 +484,7 @@ async function handle(req: Request, client: string): Promise<Response> {
                 setups: asked.setups,
                 maxTokens: raceConfig.maxTokens,
                 thinking: raceConfig.thinking,
+                sampling: samplingOf(raceConfig),
                 tool,
                 complete: event.complete,
               }),

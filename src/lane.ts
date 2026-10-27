@@ -16,6 +16,9 @@ export interface LaneRunOptions {
   prompt: string;
   maxTokens: number;
   temperature: number;
+  /** Sent only when set, so a server's own default is never overridden by accident. */
+  topP?: number;
+  topK?: number;
   timeoutMs: number;
   emit: (event: RaceEvent) => void;
   fetchImpl?: Fetcher;
@@ -225,6 +228,8 @@ export async function runLane(opts: LaneRunOptions, state: LaneState): Promise<L
         stream_options: { include_usage: true },
         max_tokens: opts.maxTokens,
         temperature: opts.temperature,
+        ...(opts.topP !== undefined ? { top_p: opts.topP } : {}),
+        ...(opts.topK !== undefined ? { top_k: opts.topK } : {}),
         ...opts.extraBody,
       }),
     });

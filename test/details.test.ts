@@ -202,9 +202,10 @@ describe("the setup travels with the results", () => {
   test("the sweep CSV gets the setup columns", () => {
     const result = { laneId: "lane-0", label: "Studio", firstWordSec: 1, lastWordSec: 11, chunks: 101, tokens: 101, totalSec: 11, error: null, blocked: null, promptTokens: 4000, cachedTokens: 0, firstWordField: "content" } as unknown as LaneResult;
     const rows = summarizeCell("4k", 1, [[result]]);
-    const csv = sweepCsv(rows, { "lane-0": { engine: "llama.cpp", modelFile: "Foo-Q8_0.gguf", quant: "Q8_0", build: "b1", slots: 2, contextPerSlot: 131072, vision: false, notes: "a, b" } }, { maxTokens: 512, thinking: "low" });
+    const csv = sweepCsv(rows, { "lane-0": { engine: "llama.cpp", modelFile: "Foo-Q8_0.gguf", quant: "Q8_0", build: "b1", slots: 2, contextPerSlot: 131072, vision: false, notes: "a, b" } }, { maxTokens: 512, thinking: "low", temperature: 0 });
     const [head, line] = csv.trimEnd().split("\n");
-    expect(head).toEndWith("engine,model_file,quant,llama_cpp_build,slots,context_per_slot,machine_notes,reply_length,thinking");
-    expect(line).toEndWith('llama.cpp,Foo-Q8_0.gguf,Q8_0,b1,2,131072,"a, b",512,low');
+    expect(head).toEndWith("engine,model_file,quant,llama_cpp_build,slots,context_per_slot,machine_notes,reply_length,thinking,temperature,top_p,top_k");
+    // top_p and top_k are blank: they were not sent, so each server used its own.
+    expect(line).toEndWith('llama.cpp,Foo-Q8_0.gguf,Q8_0,b1,2,131072,"a, b",512,low,0,,');
   });
 });

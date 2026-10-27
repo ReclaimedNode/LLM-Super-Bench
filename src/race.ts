@@ -148,6 +148,8 @@ interface RunStreamsOptions {
   /** The engine's name, so the thinking switch is sent in the form that engine reads. */
   engine?: string | null;
   temperature: number;
+  topP?: number;
+  topK?: number;
   timeoutMs: number;
   emit: (event: RaceEvent) => void;
   announceFirstWord: (laneId: string) => void;
@@ -172,6 +174,8 @@ async function runStreams(o: RunStreamsOptions): Promise<LaneResult> {
     lane,
     maxTokens: o.maxTokens,
     temperature: o.temperature,
+    topP: o.topP,
+    topK: o.topK,
     timeoutMs: o.timeoutMs,
     fetchImpl: o.fetchImpl,
     now: o.now,
@@ -375,6 +379,8 @@ export async function runRace(opts: RunRaceOptions): Promise<RaceOutcome> {
           thinking: config.thinking,
           engine: opts.laneSetups?.[laneId]?.engine ?? lane.engine ?? null,
           temperature: config.temperature,
+          topP: config.topP,
+          topK: config.topK,
           timeoutMs: config.requestTimeoutMs,
           emit,
           announceFirstWord,

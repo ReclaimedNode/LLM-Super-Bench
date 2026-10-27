@@ -27,6 +27,15 @@ export function esc(value) {
 }
 
 const PRESET_ORDER = ["short", "4k", "8k", "16k", "32k", "64k", "128k"];
+/** How a run's machines were asked to sample, for a table cell. Older files did not record it. */
+export function samplingText(settings) {
+  if (!settings || settings.temperature === null || settings.temperature === undefined) return "not recorded";
+  const parts = [`temp ${settings.temperature}`];
+  if (settings.topP !== null && settings.topP !== undefined) parts.push(`top_p ${settings.topP}`);
+  if (settings.topK !== null && settings.topK !== undefined) parts.push(`top_k ${settings.topK}`);
+  return parts.join(", ");
+}
+
 export function presetLabel(id) {
   return id === "short" ? "Short" : String(id).toUpperCase();
 }
@@ -121,7 +130,14 @@ export function readRunFile(raw) {
       createdAt: text(raw.createdAt, 40),
       complete: raw.complete !== false,
       tool: raw.tool && typeof raw.tool === "object" ? { version: text(raw.tool.version, 20), commit: /^[0-9a-f]{7,40}$/i.test(text(raw.tool.commit, 40)) ? text(raw.tool.commit, 40).toLowerCase() : null } : null,
-      settings: { maxTokens: finite(settings.maxTokens), thinking: ["auto", "low", "off"].includes(settings.thinking) ? settings.thinking : "auto" },
+      settings: {
+        maxTokens: finite(settings.maxTokens),
+        thinking: ["auto", "low", "off"].includes(settings.thinking) ? settings.thinking : "auto",
+        // Older files did not record sampling: null here, shown as "not recorded".
+        temperature: finite(settings.temperature),
+        topP: finite(settings.topP),
+        topK: finite(settings.topK),
+      },
       machines,
       rows,
     },
@@ -203,7 +219,7 @@ export function rowsToCsv(series) {
     "throughput_median", "throughput_min", "throughput_max",
     "prompt_speed_median", "prompt_speed_min", "prompt_speed_max",
     "total_median", "total_min", "total_max",
-    "engine", "model_file", "quant", "build", "slots", "context_per_slot", "notes", "max_tokens", "thinking", "watts", "speed_per_watt_median", "tool_version", "tool_commit",
+    "engine", "model_file", "quant", "build", "slots", "context_per_slot", "notes", "max_tokens", "thinking", "temperature", "top_p", "top_k", "watts", "speed_per_watt_median", "tool_version", "tool_commit",
   ];
   const out = [head.join(",")];
   const trio = (s) => (s ? [s.median, s.min, s.max] : ["", "", ""]);
@@ -215,6 +231,7 @@ export function rowsToCsv(series) {
         ...trio(r.firstWordSec), ...trio(r.speed), ...trio(r.throughput), ...trio(r.promptSpeed), ...trio(r.totalSec),
         safeText(setup.engine), safeText(setup.modelFile), setup.quant, safeText(setup.build), setup.slots, setup.contextPerSlot, safeText(setup.notes),
         s.file.settings.maxTokens, s.file.settings.thinking,
+        s.file.settings.temperature ?? "", s.file.settings.topP ?? "", s.file.settings.topK ?? "",
         s.machine?.watts ?? "", r.efficiency ? r.efficiency.median : "", safeText(s.file.tool?.version ?? ""), s.file.tool?.commit ?? "",
       ].map(csvCell).join(","));
     }

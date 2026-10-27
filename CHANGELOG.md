@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Sampling is now a setting, saved with every result. TEMPERATURE on the page (0 by default), `--temperature`,
+  `--top-p` and `--top-k` on `bun run sweep`, and `topP` / `topK` in `race.config.json`. top_p and top_k are sent
+  only when set. Above temperature 0 with either unset, the page and the sweep warn that each server will use its own
+  default (vLLM reads the model's `generation_config.json`, llama.cpp has its own), so the machines may sample
+  differently. Run files, the sweep CSV, the results page's setup table and its CSV now record temperature, top_p and
+  top_k, and the results page says when loaded files were sampled differently. A machine's `extraBody` may no longer
+  set `top_p` or `top_k`.
 - `quality:fetch` downloads more gently and can use an optional `HF_TOKEN` (free Hugging Face token) when Hugging Face limits downloads.
 - `bun run quality` asks every machine the questions of a published test and scores whether the answers are right.
   Tests: IFEval (instructions, 541 questions), MMLU-Pro and MMLU (knowledge), GSM8K and MATH-500 (maths), and a long-context

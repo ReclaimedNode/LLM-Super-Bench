@@ -30,8 +30,12 @@ export interface RunFile {
   version: typeof RUN_VERSION;
   kind: "race" | "sweep";
   createdAt: string;
-  /** What was set for every machine in the run. A thinking model's numbers mean different things with these. */
-  settings: { maxTokens: number; thinking: "auto" | "low" | "off" };
+  /**
+   * What was set for every machine in the run. A thinking model's numbers mean different things with these.
+   * temperature, topP and topK are how every machine was asked to sample; files made before they were
+   * recorded have no temperature, and topP / topK appear only when they were sent.
+   */
+  settings: { maxTokens: number; thinking: "auto" | "low" | "off"; temperature?: number; topP?: number; topK?: number };
   /** False when a sweep was stopped before it finished. */
   complete: boolean;
   /** Which version of this tool made the file. */
@@ -48,6 +52,8 @@ export interface BuildRunFileOptions {
   setups: Record<string, MachineSetup>;
   maxTokens: number;
   thinking?: "auto" | "low" | "off";
+  /** How every machine was asked to sample (settings.ts samplingOf). */
+  sampling?: { temperature: number; topP?: number; topK?: number };
   complete?: boolean;
   now?: Date;
 }
@@ -59,7 +65,13 @@ export function buildRunFile(o: BuildRunFileOptions): RunFile {
     version: RUN_VERSION,
     kind: o.kind,
     createdAt: (o.now ?? new Date()).toISOString(),
-    settings: { maxTokens: o.maxTokens, thinking: o.thinking ?? "auto" },
+    settings: {
+      maxTokens: o.maxTokens,
+      thinking: o.thinking ?? "auto",
+      ...(o.sampling ? { temperature: o.sampling.temperature } : {}),
+      ...(o.sampling?.topP !== undefined ? { topP: o.sampling.topP } : {}),
+      ...(o.sampling?.topK !== undefined ? { topK: o.sampling.topK } : {}),
+    },
     complete: o.complete ?? true,
     ...(o.tool ? { tool: o.tool } : {}),
     machines: o.lanes

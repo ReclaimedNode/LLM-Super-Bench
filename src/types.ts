@@ -28,7 +28,7 @@ export interface LaneConfig {
    * only its server understands, such as switching thinking off:
    * `{"chat_template_kwargs": {"enable_thinking": false}}` on llama-server.
    * Cannot change what is being measured, so the model, messages, streaming,
-   * token cap and temperature may not be set here.
+   * token cap and sampling (temperature, top_p, top_k) may not be set here.
    */
   extraBody?: Record<string, unknown>;
   /**
@@ -54,7 +54,15 @@ export interface RaceConfig {
   maxTokens: number;
   /** "off" sends every machine the switch that turns thinking off. Absent or "auto" leaves the model as it is. */
   thinking?: "auto" | "low" | "off";
+  /** Sent to every machine on every request. 0 asks for greedy decoding, the fair default for a speed race. */
   temperature: number;
+  /**
+   * Optional nucleus and top-k sampling, sent to every machine when set. Above temperature 0 each server
+   * otherwise falls back to its own defaults (vLLM reads the model's generation_config.json, llama.cpp
+   * has its own), so two machines would sample differently without anyone seeing it.
+   */
+  topP?: number;
+  topK?: number;
   /** Characters per token used to size the 8K / 32K presets. Approximate by definition. */
   charsPerToken: number;
   promptFile: string;

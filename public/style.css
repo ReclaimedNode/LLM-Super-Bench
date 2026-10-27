@@ -181,6 +181,12 @@ h1 {
   display: none;
 }
 
+/* A setting that makes the machines' requests differ, e.g. temperature above 0 with top_p unset. */
+.control-note.warn {
+  color: var(--nc-orange);
+  opacity: 1;
+}
+
 .choices {
   display: flex;
   flex-wrap: wrap;

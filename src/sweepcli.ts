@@ -6,6 +6,10 @@
  *   bun run sweep
  *   bun run sweep --sizes short,4k,16k --streams 1,2,4 --repeats 3
  *   bun run sweep --machines "Mac Studio,CMP 170HX" --thinking low --max-tokens 1024
+ *   bun run sweep --temperature 0.7 --top-p 0.95 --top-k 20
+ *
+ * --temperature, --top-p and --top-k apply to this sweep only and are saved with its results; they do
+ * not change race.config.json. --top-p none / --top-k none leave that setting to each server.
  *
  * Exit status: 0 when the sweep finished, 1 when it stopped early or failed, 2 for bad arguments.
  */
@@ -18,7 +22,7 @@ import { readLanesState, withServedModels } from "./lanes.ts";
 import { PRESET_IDS } from "./prompt.ts";
 import { buildRunFile } from "./runfile.ts";
 import { saveRun } from "./runstore.ts";
-import { parseSettings } from "./settings.ts";
+import { parseSettings, samplingLabel, samplingOf, samplingWarning } from "./settings.ts";
 import { parseSweepRequest, runSweep } from "./sweep.ts";
 import { toolInfo } from "./toolinfo.ts";
 import type { RaceConfig } from "./types.ts";
@@ -31,7 +35,14 @@ export interface SweepArgs {
   machines: string[] | null;
   maxTokens?: number;
   thinking?: "auto" | "low" | "off";
+  temperature?: number;
+  /** null: leave it to each server, even if the config sets one. */
+  topP?: number | null;
+  topK?: number | null;
 }
+
+/** "none" (or "off") clears a sampling setting for this sweep; anything else must be a number. */
+const sampled = (v: string | undefined): number | null => (v === "none" || v === "off" ? null : Number(v));
 
 const list = (v: string) => v.split(",").map((s) => s.trim()).filter((s) => s !== "");
 
@@ -49,16 +60,42 @@ export function parseSweepArgs(argv: string[]): { ok: true; args: SweepArgs } | 
       case "--no-warmup": args.warmup = false; break;
       case "--max-tokens": args.maxTokens = Number(next()); break;
       case "--thinking": args.thinking = next() as SweepArgs["thinking"]; break;
-      default: return { ok: false, error: `Unknown option ${a}. Options: --sizes, --streams, --repeats, --machines, --no-warmup, --max-tokens, --thinking.` };
+      case "--temperature": args.temperature = Number(next()); break;
+      case "--top-p": args.topP = sampled(next()); break;
+      case "--top-k": args.topK = sampled(next()); break;
+      default: return { ok: false, error: `Unknown option ${a}. Options: --sizes, --streams, --repeats, --machines, --no-warmup, --max-tokens, --thinking, --temperature, --top-p, --top-k.` };
     }
   }
   const badSize = args.presets.find((p) => !(PRESET_IDS as string[]).includes(p));
   if (badSize) return { ok: false, error: `Unknown prompt size "${badSize}". Choose from ${PRESET_IDS.join(", ")}.` };
-  if (args.maxTokens !== undefined || args.thinking !== undefined) {
-    const s = parseSettings({ ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}), ...(args.thinking !== undefined ? { thinking: args.thinking } : {}) });
+  const change = {
+    ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+    ...(args.thinking !== undefined ? { thinking: args.thinking } : {}),
+    ...(args.temperature !== undefined ? { temperature: args.temperature } : {}),
+    ...(args.topP !== undefined ? { topP: args.topP } : {}),
+    ...(args.topK !== undefined ? { topK: args.topK } : {}),
+  };
+  if (Object.keys(change).length > 0) {
+    const s = parseSettings(change);
     if (!s.ok) return { ok: false, error: s.error };
   }
   return { ok: true, args };
+}
+
+/** The config this sweep runs with: the saved one, with the command line's settings on top. Pure, so it can be tested. */
+export function withSweepArgs(config: RaceConfig, args: SweepArgs): RaceConfig {
+  const out: RaceConfig = {
+    ...config,
+    ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
+    ...(args.thinking !== undefined ? { thinking: args.thinking } : {}),
+    ...(args.temperature !== undefined ? { temperature: args.temperature } : {}),
+  };
+  for (const key of ["topP", "topK"] as const) {
+    const v = args[key];
+    if (v === null) delete out[key];
+    else if (v !== undefined) out[key] = v;
+  }
+  return out;
 }
 
 /** The machines by name, to the ids the sweep uses. */
@@ -79,11 +116,11 @@ async function main(): Promise<number> {
   const { args } = parsed;
   const loaded = await loadConfig();
   if (loaded.usedExample) console.error("No race.config.json yet, so this would sweep the example mock machines. Add your machines first (bun run init, or the page).");
-  const config: RaceConfig = {
-    ...loaded.config,
-    ...(args.maxTokens !== undefined ? { maxTokens: args.maxTokens } : {}),
-    ...(args.thinking !== undefined ? { thinking: args.thinking } : {}),
-  };
+  const config: RaceConfig = withSweepArgs(loaded.config, args);
+  const sampling = samplingOf(config);
+  console.log(`Sampling: ${samplingLabel(sampling)}`);
+  const warning = samplingWarning(sampling);
+  if (warning) console.error(`Warning: ${warning}`);
   const picked = laneIdsFor(config, args.machines);
   if (!picked.ok) {
     console.error(picked.error);
@@ -136,6 +173,7 @@ async function main(): Promise<number> {
             setups: asked.setups,
             maxTokens: raceConfig.maxTokens,
             thinking: raceConfig.thinking,
+            sampling: samplingOf(raceConfig),
             tool,
             complete: event.complete,
           }),

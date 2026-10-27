@@ -21,6 +21,8 @@ const el = {
   replyNote: document.getElementById("reply-note"),
   thinkingSwitch: document.getElementById("thinking-switch"),
   thinkingNote: document.getElementById("thinking-note"),
+  temperatureSwitch: document.getElementById("temperature-switch"),
+  samplingNote: document.getElementById("sampling-note"),
   editorRows: document.getElementById("editor-rows"),
   editorSave: document.getElementById("editor-save"),
   editorStatus: document.getElementById("editor-status"),
@@ -62,6 +64,10 @@ let machineButtons = [];
 let replyButtons = [];
 let thinkingButtons = [];
 let currentThinking = "auto";
+let temperatureButtons = [];
+// How every machine is asked to sample. topP / topK are null when each server keeps its own default.
+let currentSampling = { temperature: 0, topP: null, topK: null };
+let samplingWarningText = null;
 let currentReply = 512;
 let configLanes = [];
 
@@ -84,7 +90,7 @@ let sweepStreamOptions = [1];
 
 function choiceButtons() {
   return [
-    ...machineButtons, ...presetButtons, ...streamButtons, ...replyButtons, ...thinkingButtons,
+    ...machineButtons, ...presetButtons, ...streamButtons, ...replyButtons, ...thinkingButtons, ...temperatureButtons,
     ...sweepSizeButtons, ...sweepStreamButtons, ...sweepRepeatButtons,
     ...(sweepWarmupButton ? [sweepWarmupButton] : []),
   ];
@@ -440,12 +446,23 @@ async function changeSetting(change) {
     }
     currentReply = answer.maxTokens;
     currentThinking = answer.thinking;
+    readSampling(answer);
     if (answer.saved === false) logLine("Changed until the server restarts. Save your machines once and it is kept.");
     return true;
   } catch (err) {
     logLine(`Not changed. ${err.message}`, "bad");
     return false;
   }
+}
+
+/** The server sends temperature always, topP / topK only when set. */
+function readSampling(source) {
+  currentSampling = {
+    temperature: typeof source.temperature === "number" ? source.temperature : 0,
+    topP: typeof source.topP === "number" ? source.topP : null,
+    topK: typeof source.topK === "number" ? source.topK : null,
+  };
+  samplingWarningText = typeof source.samplingWarning === "string" ? source.samplingWarning : null;
 }
 
 function paintSettings() {
@@ -457,11 +474,23 @@ function paintSettings() {
     : currentThinking === "low"
       ? "Every machine is asked for the least reasoning it offers (reasoning_effort low). A model without that setting ignores it."
       : "The model is left as it is. A thinking model can use its whole reply thinking.";
+  for (const b of temperatureButtons) b.setAttribute("aria-pressed", String(Number(b.dataset.temperature) === currentSampling.temperature));
+  const extra = [
+    currentSampling.topP !== null ? `top_p ${currentSampling.topP}` : null,
+    currentSampling.topK !== null ? `top_k ${currentSampling.topK}` : null,
+  ].filter(Boolean);
+  const base = currentSampling.temperature === 0
+    ? "Greedy (temperature 0): every machine picks its most likely word, the fair setting for a speed race."
+    : `Every machine is sent temperature ${currentSampling.temperature}${extra.length ? `, ${extra.join(", ")}` : ""}.`;
+  const sets = currentSampling.temperature === 0 && extra.length ? ` Also sent: ${extra.join(", ")}.` : "";
+  el.samplingNote.textContent = samplingWarningText ? `${base}${sets} ${samplingWarningText}` : `${base}${sets}`;
+  el.samplingNote.classList.toggle("warn", Boolean(samplingWarningText));
 }
 
 function buildSettings(config) {
   currentReply = config.maxTokens;
   currentThinking = config.thinking ?? "auto";
+  readSampling(config);
   const lengths = [...new Set([...(config.replyLengths ?? [512]), config.maxTokens])].sort((x, y) => x - y);
   const mk = (parent, items) =>
     items.map((item) => {
@@ -481,11 +510,13 @@ function buildSettings(config) {
       });
       button.dataset.tokens = item.tokens ?? "";
       button.dataset.thinking = item.thinking ?? "";
+      button.dataset.temperature = item.temperature ?? "";
       parent.append(button);
       return button;
     });
   el.replyLength.textContent = "";
   el.thinkingSwitch.textContent = "";
+  el.temperatureSwitch.textContent = "";
   replyButtons = mk(el.replyLength, lengths.map((n) => ({
     label: kLabel(n), title: `Each machine may write up to ${n} tokens`, tokens: n, change: { maxTokens: n },
   })));
@@ -494,6 +525,16 @@ function buildSettings(config) {
     { label: "LOW", title: "ask every machine for the least reasoning (reasoning_effort low)", thinking: "low", change: { thinking: "low" } },
     { label: "OFF", title: "ask every machine not to think", thinking: "off", change: { thinking: "off" } },
   ]);
+  // The config's own temperature gets a button too, so a value set there is always shown.
+  const temperatures = [...new Set([...(config.temperatures ?? [0]), currentSampling.temperature])].sort((x, y) => x - y);
+  temperatureButtons = mk(el.temperatureSwitch, temperatures.map((t) => ({
+    label: t === 0 ? "0 (GREEDY)" : String(t),
+    title: t === 0
+      ? "every machine picks its most likely word: the fair setting for a speed race"
+      : `send every machine temperature ${t}; set topP and topK in race.config.json so they all sample alike`,
+    temperature: t,
+    change: { temperature: t },
+  })));
   paintSettings();
 }
 

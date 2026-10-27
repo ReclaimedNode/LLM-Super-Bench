@@ -12,6 +12,7 @@
 import type { MachineSetup } from "./details.ts";
 import { isPresetId } from "./prompt.ts";
 import { runRace } from "./race.ts";
+import { samplingOf } from "./settings.ts";
 import type { RunRaceOptions } from "./race.ts";
 import { laneSpeed, laneThroughput, median, promptSpeed } from "./timing.ts";
 import type { LaneResult, PresetId, RaceEvent } from "./types.ts";
@@ -191,6 +192,9 @@ const CSV_COLUMNS = [
   "machine_notes",
   "reply_length",
   "thinking",
+  "temperature",
+  "top_p",
+  "top_k",
 ];
 
 function csvCell(value: string | number | null): string {
@@ -203,7 +207,7 @@ function csvCell(value: string | number | null): string {
 export function sweepCsv(
   rows: SweepRow[],
   setups: Record<string, MachineSetup> = {},
-  settings: { maxTokens?: number; thinking?: string } = {},
+  settings: { maxTokens?: number; thinking?: string; temperature?: number; topP?: number; topK?: number } = {},
 ): string {
   const trio = (s: Spread | null) => [s?.median ?? null, s?.min ?? null, s?.max ?? null];
   const lines = rows.map((r) =>
@@ -229,6 +233,9 @@ export function sweepCsv(
       setups[r.laneId]?.notes ?? null,
       settings.maxTokens ?? null,
       settings.thinking ?? null,
+      settings.temperature ?? null,
+      settings.topP ?? null,
+      settings.topK ?? null,
     ]
       .map(csvCell)
       .join(","),
@@ -332,7 +339,7 @@ export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
   const done: SweepDone = {
     type: "sweep-done",
     rows,
-    csv: sweepCsv(rows, opts.laneSetups, { maxTokens: opts.config.maxTokens, thinking: opts.config.thinking ?? "auto" }),
+    csv: sweepCsv(rows, opts.laneSetups, { maxTokens: opts.config.maxTokens, thinking: opts.config.thinking ?? "auto", ...samplingOf(opts.config) }),
     complete,
     ...(stoppedByUser ? { stopped: true } : {}),
   };

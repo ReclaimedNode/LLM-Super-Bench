@@ -23,6 +23,11 @@ const DEFAULTS = {
   maxConcurrency: 16,
 };
 
+/** The highest temperature accepted. Servers differ above 2 and nothing useful is measured there. */
+export const MAX_TEMPERATURE = 2;
+/** The highest top_k accepted. */
+export const MAX_TOP_K = 1000;
+
 /** More than this and the page is asking one machine for more streams than any of these servers has slots. */
 export const MAX_CONCURRENCY_LIMIT = 64;
 
@@ -84,7 +89,7 @@ export function validateConfig(raw: unknown): RaceConfig {
       if (typeof body !== "object" || body === null || Array.isArray(body)) {
         fail(`lane ${i} \`extraBody\` must be a JSON object`);
       }
-      const reserved = ["model", "messages", "stream", "stream_options", "max_tokens", "temperature"];
+      const reserved = ["model", "messages", "stream", "stream_options", "max_tokens", "temperature", "top_p", "top_k"];
       const clash = Object.keys(body).filter((k) => reserved.includes(k));
       if (clash.length > 0) {
         fail(`lane ${i} \`extraBody\` may not set ${clash.join(", ")}: the race sets those so both machines get the same request`);
@@ -127,6 +132,21 @@ export function validateConfig(raw: unknown): RaceConfig {
     return v as "auto" | "low" | "off";
   };
 
+  const temperature = obj.temperature === undefined ? DEFAULTS.temperature : num("temperature", 0);
+  if (temperature > MAX_TEMPERATURE) fail(`\`temperature\` must be a number from 0 to ${MAX_TEMPERATURE}`);
+  let topP: number | undefined;
+  if (obj.topP !== undefined && obj.topP !== null) {
+    const v = obj.topP;
+    if (typeof v !== "number" || !Number.isFinite(v) || v <= 0 || v > 1) fail("`topP` must be a number above 0 and at most 1");
+    topP = v as number;
+  }
+  let topK: number | undefined;
+  if (obj.topK !== undefined && obj.topK !== null) {
+    const v = obj.topK;
+    if (typeof v !== "number" || !Number.isInteger(v) || v < 1 || v > MAX_TOP_K) fail(`\`topK\` must be a whole number from 1 to ${MAX_TOP_K}`);
+    topK = v as number;
+  }
+
   const promptFile = typeof obj.promptFile === "string" && obj.promptFile.trim() !== ""
     ? obj.promptFile
     : DEFAULTS.promptFile;
@@ -140,7 +160,9 @@ export function validateConfig(raw: unknown): RaceConfig {
     port: num("port", 1),
     maxTokens: num("maxTokens", 1),
     ...(obj.thinking === undefined ? {} : { thinking: thinkingOf(obj.thinking) }),
-    temperature: obj.temperature === undefined ? DEFAULTS.temperature : num("temperature", 0),
+    temperature,
+    ...(topP !== undefined ? { topP } : {}),
+    ...(topK !== undefined ? { topK } : {}),
     charsPerToken: num("charsPerToken", 1),
     promptFile,
     requestTimeoutMs: num("requestTimeoutMs", 1000),
