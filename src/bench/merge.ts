@@ -19,7 +19,7 @@
  * Neither source folder is opened for writing at any point.
  */
 
-import { cp, readdir } from "node:fs/promises";
+import { cp, mkdir, readdir, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 import { IMAGE_CELLS_FILE, IMAGE_RUNS_FILE, manifestFromImageRuns, readImageRuns } from "./imagerunner.ts";
 import { buildReport } from "./report.ts";
@@ -276,6 +276,11 @@ export async function readMergeSource(runName: string): Promise<MergeSource> {
   };
 }
 
+/** True when something is already at this path. */
+async function exists(path: string): Promise<boolean> {
+  return stat(path).then(() => true, () => false);
+}
+
 /** Copies a run folder's media directory across, keeping every file. */
 async function carryMedia(from: string, into: string, dir: "images" | "clips"): Promise<number> {
   const source = resolve(runDir(from), dir);
@@ -286,10 +291,21 @@ async function carryMedia(from: string, into: string, dir: "images" | "clips"): 
     return 0;
   }
   if (names.length === 0) return 0;
-  // Lane labels are part of every filename and two lanes cannot share a label
-  // here, so nothing collides; `force: false` makes that a loud failure rather
-  // than a silent overwrite if it ever stops being true.
-  await cp(source, resolve(runDir(into), dir), { recursive: true, force: false, errorOnExist: true });
+  // Both runs copy into the same folder, so the folder itself already exists for
+  // the second one. Lane labels are part of every filename and two lanes cannot
+  // share a label here, so no file collides; checking each name first makes a
+  // collision a loud failure rather than a silent overwrite if that ever stops
+  // being true. (Copying the whole folder onto an existing one is refused by
+  // Bun's cp even when no file inside clashes.)
+  const target = resolve(runDir(into), dir);
+  await mkdir(target, { recursive: true });
+  for (const name of names) {
+    const dest = resolve(target, name);
+    if (await exists(dest)) {
+      throw new MergeError(`Both runs have ${dir}/${name}. Nothing was overwritten; rename one run's lane and merge again.`);
+    }
+    await cp(resolve(source, name), dest, { recursive: true, force: false, errorOnExist: true });
+  }
   return names.length;
 }
 

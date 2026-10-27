@@ -97,6 +97,8 @@ describeIfPython("the shim, run for real against a stand-in mflux", () => {
     expect(parsed.images.filter((i) => i.warmup)).toHaveLength(1);
     expect(parsed.images.filter((i) => !i.warmup)).toHaveLength(2);
     expect(parsed.peakMemoryGb).not.toBeNull();
+    // The stand-in MLX reports 12 GiB in bytes; the shim converts it to GB.
+    expect(parsed.peakMemoryGb).toBe(12);
   });
 
   test("the model is loaded ONCE, however many images are asked for", async () => {
@@ -198,8 +200,12 @@ describeIfPython("the shim, run for real against a stand-in mflux", () => {
     const bad = await runShim(["--kind", "not-a-model", "--model", "x", "--prompt", "p", "--seed", "1", "--count", "1", "--output", `${dir}/o_{i}.png`], dir);
     expect(bad.code).not.toBe(0);
 
-    // And a failure inside the run is reported in the shape the runner reads.
-    const broken = await runShim(baseArgs("z-image-turbo", dir, ["--output", "/nope/cannot/write_{i}.png"]), dir);
+    // And a failure inside the run is reported in the shape the runner reads. The output folder
+    // sits under an ordinary file, which no one can create a folder in -- not even root, so this
+    // fails the same way on a laptop and in a container (a path like /nope can be created by root).
+    const blocker = join(dir, "not-a-folder");
+    await Bun.write(blocker, "");
+    const broken = await runShim(baseArgs("z-image-turbo", dir, ["--output", `${blocker}/write_{i}.png`]), dir);
     expect(broken.code).not.toBe(0);
     const parsed = parseShimOutput(broken.stdout);
     expect(parsed.error).not.toBeNull();

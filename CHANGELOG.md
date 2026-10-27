@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Fixed: merging two image (or clip) runs failed with "Target already exists" because the second run's folder was
+  copied onto the first's. Files are now copied one by one, and a real clash between two files still stops the merge.
+- Tests: the image shim tests carry a stand-in for MLX's memory reading and use an output path no one can create,
+  so they pass on any machine, including one without MLX and one running as root.
 - Sampling is now a setting, saved with every result. TEMPERATURE on the page (0 by default), `--temperature`,
   `--top-p` and `--top-k` on `bun run sweep`, and `topP` / `topK` in `race.config.json`. top_p and top_k are sent
   only when set. Above temperature 0 with either unset, the page and the sweep warn that each server will use its own
