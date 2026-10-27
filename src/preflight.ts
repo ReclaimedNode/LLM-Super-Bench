@@ -5,7 +5,9 @@
  *  1. The configured model id must appear in GET {base}/v1/models. mlx_lm.server
  *     treats an unknown `model` as a model to DOWNLOAD -- it calls out to
  *     huggingface.co and 404s. A lane that would do that is refused, loudly,
- *     instead of racing.
+ *     instead of racing. mlx-vlm also lists models it has NOT loaded (marked
+ *     `"loaded": false`); asking for one makes it unload the loaded model and
+ *     load that one mid-race, so that is refused too.
  *  2. A one-token streaming probe asking for `stream_options.include_usage`,
  *     which answers "does this endpoint report token counts?" before the race
  *     rather than after it. The probe also warms the model on every lane
@@ -43,6 +45,20 @@ export function extractModelIds(body: unknown): string[] {
     }
   }
   return ids;
+}
+
+/**
+ * mlx-vlm marks each listed model `loaded: true|false`. When the configured one is listed but not loaded
+ * while another is, a request for it would swap models. Null when the server does not mark entries.
+ */
+export function notLoadedModel(body: unknown, model: string): { loaded: string } | null {
+  const data = typeof body === "object" && body !== null ? (body as { data?: unknown }).data : null;
+  if (!Array.isArray(data)) return null;
+  const entries = data.filter((e): e is Record<string, unknown> => typeof e === "object" && e !== null);
+  const mine = entries.find((e) => e.id === model);
+  const other = entries.find((e) => e.loaded === true && typeof e.id === "string" && e.id !== model);
+  if (mine && mine.loaded === false && other) return { loaded: other.id as string };
+  return null;
 }
 
 /** Does this endpoint return a usage block when asked? One cheap streaming call. */
@@ -112,6 +128,7 @@ export async function preflightLane(opts: {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), opts.timeoutMs);
   let ids: string[];
+  let listing: unknown = null;
   try {
     const res = await fetchImpl(`${lane.baseUrl}/v1/models`, {
       headers: authHeaders(lane),
@@ -125,7 +142,8 @@ export async function preflightLane(opts: {
         availableModels: [],
       };
     }
-    ids = extractModelIds(await res.json());
+    listing = await res.json();
+    ids = extractModelIds(listing);
   } catch (err) {
     const reason = err instanceof DOMException && err.name === "AbortError"
       ? `no answer in ${Math.round(opts.timeoutMs / 1000)}s`
@@ -149,6 +167,19 @@ export async function preflightLane(opts: {
       message:
         `${lane.label} will not start: this endpoint does not have the configured model. ` +
         `It lists: ${shown}${ids.length > 4 ? ` (+${ids.length - 4} more)` : ""}.`,
+      usageSupported: null,
+      availableModels: ids,
+    };
+  }
+
+  const swap = notLoadedModel(listing, lane.model);
+  if (swap !== null) {
+    return {
+      ok: false,
+      message:
+        `${lane.label} will not start: the server lists the configured model but has ${swap.loaded} loaded. ` +
+        "Asking for the configured one would make it unload and load models during the race. " +
+        "Set this machine's model to the loaded one, or restart the server with the one you want.",
       usageSupported: null,
       availableModels: ids,
     };

@@ -24,6 +24,7 @@ export const PROBE_PATHS = [
   "/api/ps",
   "/api/v0/models",
   "/api/extra/version",
+  "/v1/settings",
   "/metrics",
 ] as const;
 
@@ -41,6 +42,8 @@ export function redact(text: string): string {
 export interface ProbeAnswer {
   path: string;
   status: number | null;
+  /** The Server header: some engines name themselves and their version there (mlx-vlm, Python's http.server). */
+  server: string | null;
   type: string | null;
   snippet: string | null;
   error: string | null;
@@ -61,9 +64,9 @@ export async function askAll(baseUrl: string, opts: { apiKey?: string; fetchImpl
         const shown = path === "/metrics"
           ? body.split("\n").filter((l) => /max_num_seqs|^# HELP (vllm|sglang|tgi|llamacpp)/i.test(l)).slice(0, 6).join("\n")
           : body;
-        return { path, status: r.status, type: r.headers.get("content-type"), snippet: shown.slice(0, SNIPPET), error: null };
+        return { path, status: r.status, server: r.headers.get("server"), type: r.headers.get("content-type"), snippet: shown.slice(0, SNIPPET), error: null };
       } catch (err) {
-        return { path, status: null, type: null, snippet: null, error: err instanceof Error && err.name === "AbortError" ? "no answer in time" : "could not connect" };
+        return { path, status: null, server: null, type: null, snippet: null, error: err instanceof Error && err.name === "AbortError" ? "no answer in time" : "could not connect" };
       } finally {
         clearTimeout(timer);
       }
@@ -83,6 +86,8 @@ export async function probeReport(baseUrl: string, opts: { apiKey?: string; fetc
   lines.push(`  slots:             ${details.slots ?? "not reported"}`);
   lines.push(`  context per slot:  ${details.contextPerSlot ?? "not reported"}`);
   lines.push(`  images:            ${details.vision ?? "not reported"}`);
+  const server = answers.find((a) => a.server)?.server ?? null;
+  lines.push(`  server header:     ${server ?? "none"}`);
   lines.push("", "What each address answered:");
   for (const a of answers) {
     if (a.error) {

@@ -65,6 +65,26 @@ export function quantOf(file: string | null): string | null {
   return m ? m[1]!.toUpperCase() : null;
 }
 
+/** A folder named only for its bit width ("8-bit", "4bit"), as MLX conversions often use. */
+const BIT_FOLDER = /^(\d{1,2})[-_ ]?bits?$/i;
+
+/** MLX bit width from a name or path: "Foo-MLX/8-bit" or "mlx-community/Foo-4bit" -> "MLX 8-bit" / "MLX 4-bit". */
+export function mlxQuantOf(name: string | null): string | null {
+  if (!name) return null;
+  const m = /(?:^|[-_/\\ ])(\d{1,2})[-_ ]?bits?(?=$|[-_/\\ ])/i.exec(name);
+  return m ? `MLX ${m[1]}-bit` : quantOf(baseName(name));
+}
+
+/**
+ * The model's name without its folder. A path ending in a bit-width folder keeps its parent, because
+ * "/models/Foo-MLX/8-bit" -> "8-bit" names nothing: it becomes "Foo-MLX/8-bit".
+ */
+export function shortModelName(path: string): string {
+  const parts = path.split(/[\\/]/).filter((p) => p !== "");
+  const last = parts[parts.length - 1] ?? path;
+  return BIT_FOLDER.test(last) && parts.length > 1 ? `${parts[parts.length - 2]}/${last}` : last;
+}
+
 /** "/Users/me/models/Foo-Q8_0.gguf" or "C:\\models\\Foo.gguf" -> "Foo-Q8_0.gguf". */
 export function baseName(path: string): string {
   const parts = path.split(/[\\/]/).filter((p) => p !== "");
@@ -88,6 +108,29 @@ async function getJson(lane: LaneConfig, path: string, timeoutMs: number, fetchI
     return await response.json();
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Like getJson, plus the Server header, which some engines use to say what and which version they are. */
+async function getJsonAndServer(
+  lane: LaneConfig,
+  path: string,
+  timeoutMs: number,
+  fetchImpl: Fetcher,
+): Promise<{ body: unknown | null; server: string | null }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const headers: Record<string, string> = {};
+    if (lane.apiKey) headers.Authorization = `Bearer ${lane.apiKey}`;
+    const response = await fetchImpl(`${lane.baseUrl}${path}`, { headers, signal: controller.signal });
+    const server = response.headers.get("server");
+    if (!response.ok) return { body: null, server };
+    return { body: await response.json().catch(() => null), server };
+  } catch {
+    return { body: null, server: null };
   } finally {
     clearTimeout(timer);
   }
@@ -130,6 +173,16 @@ export interface ExtraAnswers {
   tgi?: unknown | null;
   /** Strata: GET /health, which answers with JSON naming the model and `max_context`. */
   strata?: unknown | null;
+  /** GET /health again, read for the MLX servers (mlx-vlm names its loaded model and context there). */
+  health?: unknown | null;
+  /** The Server header that came with GET /health: "mlx_vlm/0.7.10", or Python's "BaseHTTP/0.6 ..." for mlx_lm.server. */
+  server?: string | null;
+  /** mlx-vlm: GET /v1/settings, its runtime settings (drafter and so on). Asked only when the server is mlx-vlm. */
+  mlxSettings?: unknown | null;
+  /** GET /v1/models `data`, for engines recognised by the shape of their list. */
+  models?: unknown[] | null;
+  /** The model this machine is configured for, so mlx_lm.server's list (cached models first) is read for the right one. */
+  configuredModel?: string | null;
 }
 
 interface EngineReading {
@@ -212,6 +265,46 @@ export function readEngine(modelId: string | null, first: Record<string, unknown
     };
   }
 
+  // mlx-vlm says so in its Server header ("mlx_vlm/0.7.10"); its /health also has fields no other engine sends.
+  const health = obj(extra.health);
+  const server = str(extra.server);
+  const vlmHeader = server !== null && /^mlx[_-]vlm\//i.test(server);
+  const vlmHealth = health !== null && str(health.status) === "healthy" && "loaded_model" in health && "continuous_batching_enabled" in health;
+  if (vlmHeader || vlmHealth) {
+    const version = vlmHeader ? server!.replace(/^mlx[_-]vlm\//i, "").split(/\s/)[0]! : null;
+    const loaded = str(health?.loaded_model) ?? modelId;
+    const current = obj(obj(extra.mlxSettings)?.current);
+    const drafter = str(current?.draft_kind) ?? (str(current?.draft_model) ? "speculative" : null);
+    return {
+      engine: "mlx-vlm",
+      build: [version ? `mlx-vlm ${version}` : "mlx-vlm", drafter ? `${drafter} drafter` : null].filter(Boolean).join(", "),
+      modelFile: loaded ? shortModelName(loaded) : null,
+      quant: mlxQuantOf(loaded),
+      // --max-num-seqs is not reported anywhere; set `slots` on the machine.
+      slots: null,
+      context: num(health?.effective_context_limit) ?? num(health?.loaded_context_size),
+    };
+  }
+
+  // mlx_lm.server is Python's built-in http.server: a "BaseHTTP/..." Server header, a bare {"status":"ok"}
+  // at /health, and /v1/models entries with no owned_by. It reports no version or limits.
+  const listed = Array.isArray(extra.models) ? extra.models : [];
+  const plainList = listed.length > 0 && listed.every((m) => obj(m) !== null && !("owned_by" in obj(m)!));
+  if (server !== null && /^BaseHTTP\//.test(server) && health !== null && str(health.status) === "ok" && plainList) {
+    const wanted = str(extra.configuredModel);
+    const ids = listed.map((m) => str(obj(m)?.id)).filter((x): x is string => x !== null);
+    // It lists the models in the Hugging Face cache first and the one it was started with last.
+    const model = (wanted !== null && ids.includes(wanted) ? wanted : null) ?? ids[ids.length - 1] ?? null;
+    return {
+      engine: "mlx-lm",
+      build: "mlx-lm",
+      modelFile: model ? shortModelName(model) : null,
+      quant: mlxQuantOf(model),
+      slots: null,
+      context: null,
+    };
+  }
+
   const kobold = obj(extra.kobold);
   if (kobold !== null && /kobold/i.test(str(kobold.result) ?? "")) {
     const version = str(kobold.version);
@@ -237,7 +330,7 @@ export function readEngine(modelId: string | null, first: Record<string, unknown
 
 /** Reads the three answers into one record. Pure, so it can be tested without a server. */
 export function readDetails(
-  lane: Pick<LaneConfig, "label" | "slots" | "notes" | "engine">,
+  lane: Pick<LaneConfig, "label" | "slots" | "notes" | "engine"> & Partial<Pick<LaneConfig, "model">>,
   laneId: string,
   answers: {
     props: unknown | null;
@@ -270,7 +363,8 @@ export function readDetails(
   const maxSeqs = answers.metrics ? /max_num_seqs="(\d+)"/.exec(answers.metrics) : null;
   const metricSlots = maxSeqs && Number(maxSeqs[1]) > 0 ? Number(maxSeqs[1]) : null;
 
-  const other = readEngine(str(first?.id), first, answers.extra ?? {});
+  const listed = Array.isArray(obj(answers.models)?.data) ? (obj(answers.models)!.data as unknown[]) : null;
+  const other = readEngine(str(first?.id), first, { models: listed, configuredModel: lane.model ?? null, ...(answers.extra ?? {}) });
   const engine = lane.engine ?? (props !== null && (props.model_path !== undefined || props.build_info !== undefined) ? "llama.cpp" : vllm ? "vLLM" : other.engine);
 
   const modalities = obj(props?.modalities);
@@ -303,7 +397,7 @@ export function readDetails(
     vision: vision ?? other.vision ?? null,
     notes: lane.notes ?? null,
     // llama-server lists the model by its full path; the folder stays off the page.
-    modelId: str(first?.id) ? baseName(str(first?.id)!) : null,
+    modelId: str(first?.id) ? shortModelName(str(first?.id)!) : null,
     trainContext: num(meta?.n_ctx_train),
     parameters: num(meta?.n_params),
     templateMentionsThinking,
@@ -325,8 +419,8 @@ export async function probeDetails(lane: LaneConfig, laneId: string, opts: Detai
   if (props === null) {
     // Every other engine has its own status address; each that is not there just answers 404.
     const ask = (path: string) => getJson(lane, path, timeoutMs, fetchImpl);
-    let ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, strata;
-    [version, metrics, ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, strata] = await Promise.all([
+    let ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, healthAnswer;
+    [version, metrics, ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, healthAnswer] = await Promise.all([
       ask("/version"),
       getText(lane, "/metrics", timeoutMs, fetchImpl),
       ask("/api/version"),
@@ -336,9 +430,14 @@ export async function probeDetails(lane: LaneConfig, laneId: string, opts: Detai
       ask("/get_server_info"),
       ask("/api/extra/version"),
       ask("/info"),
-      ask("/health"),
+      getJsonAndServer(lane, "/health", timeoutMs, fetchImpl),
     ]);
-    Object.assign(extra, { ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, strata });
+    const strata = healthAnswer.body;
+    Object.assign(extra, { ollamaVersion, ollamaPs, ollamaTags, lmstudio, sglang, kobold, tgi, strata, health: strata, server: healthAnswer.server });
+    // mlx-vlm keeps its drafter settings at /v1/settings; asked only once the server said it is mlx-vlm.
+    if (healthAnswer.server !== null && /^mlx[_-]vlm\//i.test(healthAnswer.server)) {
+      extra.mlxSettings = await ask("/v1/settings");
+    }
   }
   return readDetails(lane, laneId, { props, slots, models, version, metrics, extra });
 }

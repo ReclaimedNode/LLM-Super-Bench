@@ -388,9 +388,17 @@ Any server with an OpenAI-compatible streaming endpoint can be raced. The machin
 | KoboldCpp | `/api/extra/version` | version |
 | TGI | `/info` | version, model, max concurrent requests, context |
 | Strata | `/health` (`max_context`, `loaded`) | model, context, image support |
+| mlx-vlm | `Server: mlx_vlm/<version>` header, `/health`, `/v1/settings` | version, loaded model, MLX bit width, context, drafter |
+| mlx-lm (`mlx_lm.server`) | Python `BaseHTTP` server header, `/health`, `/v1/models` | model, MLX bit width |
 | TensorRT-LLM | `/v1/models` (`owned_by`) | name only |
 
 Those endpoints were written from each engine's documentation, not tested against every version, so treat a "not reported" as "this server did not say", and open an issue with the output of that engine's status address if one is wrong.
+
+Neither MLX server reports how many requests it runs at once, so put `"slots"` on an MLX lane (mlx-vlm's
+`--max-num-seqs`). Use the exact model id the server lists (for mlx-vlm, the folder path it was started
+with): both treat any other name as a model to load or download. mlx-vlm also lists models it has not
+loaded; a lane set to one of those is refused before the race, because asking for it would make the
+server swap models mid-race.
 
 Strata listens on `127.0.0.1` by default. To race it from another computer, start it with `--host 0.0.0.0 --api-key <secret>` and put the same key as `"apiKey"` on its lane in `race.config.json`.
 

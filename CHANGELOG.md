@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- mlx-vlm and mlx-lm (`mlx_lm.server`) are recognised. mlx-vlm: version (from its `Server` header), loaded model,
+  MLX bit width, context and whether a speculative drafter is loaded. mlx-lm: model and bit width. A path ending in a
+  bit-width folder is shown with its parent (`Foo-MLX/8-bit`, not `8-bit`). Preflight refuses a lane set to a model
+  mlx-vlm lists but has not loaded, since asking for it would swap models mid-race. `bun run probe` now shows the
+  `Server` header and asks `/v1/settings`.
 - Fixed: merging two image (or clip) runs failed with "Target already exists" because the second run's folder was
   copied onto the first's. Files are now copied one by one, and a real clash between two files still stops the merge.
 - Tests: the image shim tests carry a stand-in for MLX's memory reading and use an output path no one can create,
