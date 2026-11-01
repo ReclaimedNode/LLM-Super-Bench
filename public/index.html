@@ -18,6 +18,15 @@
       <div class="control">
         <span class="control-name" id="machines-name">MACHINES</span>
         <div class="choices" id="machines" role="group" aria-labelledby="machines-name"></div>
+        <div class="choices picks" id="machine-picks" role="group" aria-label="Which machines" hidden></div>
+        <p class="control-note" id="picks-note" aria-live="polite"></p>
+      </div>
+
+      <div class="control">
+        <span class="control-name">RESULTS</span>
+        <div class="choices">
+          <a class="choice-link" id="compare-files" href="/results.html?compare" target="_blank" rel="noopener" title="opens an empty results tab for run files people send you">COMPARE RUN FILES</a>
+        </div>
       </div>
 
       <div class="control">
@@ -57,13 +66,6 @@
 
     <!-- Shown only when the repository has a newer version, and never during a race. Telling, not updating. -->
     <div class="updatebar" id="updatebar" hidden role="status"></div>
-
-    <!-- Always there: a results tab that starts empty, for run files people send you. -->
-    <div class="filesbar">
-      <span class="control-name">RUN FILES</span>
-      <a class="start" id="compare-files" href="/results.html?compare" target="_blank" rel="noopener">COMPARE RUN FILES</a>
-      <span class="control-note">Opens an empty results tab. Add files people send you, and only those are drawn.</span>
-    </div>
 
     <!-- Appears after a race or sweep finishes: the graphs open in a new tab, and the numbers can be saved to share. -->
     <div class="resultsbar" id="resultsbar" hidden>

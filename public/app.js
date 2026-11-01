@@ -36,6 +36,8 @@ const el = {
   sweepNote: document.getElementById("sweep-note"),
   sweepStart: document.getElementById("sweep-start"),
   resultsBar: document.getElementById("resultsbar"),
+  machinePicks: document.getElementById("machine-picks"),
+  picksNote: document.getElementById("picks-note"),
   updateBar: document.getElementById("updatebar"),
   sweepCsv: document.getElementById("sweep-csv"),
   sweepTableWrap: document.getElementById("sweep-table-wrap"),
@@ -56,11 +58,13 @@ let selectedPreset = "short";
 let presetButtons = [];
 let racing = false;
 
-// Which machines race: "all" is head to head, anything else is one lane's id.
-// "head" races two machines against each other; "solo" runs the first one on its own.
+// "head" races exactly two machines against each other; "solo" runs one on its own.
+// picked holds the lane ids that race, two for head to head and one for solo, chosen from every saved machine.
 let mode = "head";
-let selectedMachine = "all";
+let picked = [];
 let machineButtons = [];
+let pickButtons = [];
+const PICK_KEY = "llm-super-bench.picked";
 let replyButtons = [];
 let thinkingButtons = [];
 let currentThinking = "auto";
@@ -216,16 +220,89 @@ function speedUnitText(unit) {
   return shownStreams > 1 ? `${unit} per stream · median of ${shownStreams}` : unit;
 }
 
-function machineIdFor(m) {
-  return m === "head" || !configLanes[0] ? "all" : configLanes[0].laneId;
+/** How many machines the mode races. */
+function pickCount(m = mode) {
+  return m === "head" ? 2 : 1;
+}
+
+/** Machine names saved in this browser, so the same pair is picked after a reload. Best effort. */
+function rememberedPicks() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PICK_KEY) ?? "{}");
+    return Array.isArray(v?.[mode]) ? v[mode] : [];
+  } catch {
+    return [];
+  }
+}
+
+function rememberPicks() {
+  try {
+    const v = JSON.parse(localStorage.getItem(PICK_KEY) ?? "{}") ?? {};
+    v[mode] = picked.map((id) => configLanes.find((l) => l.laneId === id)?.label).filter(Boolean);
+    localStorage.setItem(PICK_KEY, JSON.stringify(v));
+  } catch {
+    /* private window or storage off: the default pick still works */
+  }
+}
+
+/** Keeps the pick valid for the machines there are: remembered names first, then the first machines in the list. */
+function settlePicks() {
+  const ids = configLanes.map((l) => l.laneId);
+  const byName = rememberedPicks().map((n) => configLanes.find((l) => l.label === n)?.laneId).filter(Boolean);
+  const keep = [...new Set([...picked.filter((id) => ids.includes(id)), ...byName])];
+  const next = [...keep, ...ids.filter((id) => !keep.includes(id))].slice(0, pickCount());
+  picked = ids.filter((id) => next.includes(id)); // race order follows the saved order
+}
+
+/** One button per saved machine, shown only when there are more machines than the mode races. */
+function renderPicks() {
+  const need = pickCount();
+  el.machinePicks.textContent = "";
+  el.machinePicks.hidden = configLanes.length <= need;
+  pickButtons = configLanes.map((lane) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = lane.label;
+    b.title = mode === "head" ? `race ${lane.label} head to head` : `run ${lane.label} on its own`;
+    b.dataset.lane = lane.laneId;
+    b.setAttribute("aria-pressed", String(picked.includes(lane.laneId)));
+    b.addEventListener("click", () => {
+      if (racing || picked.includes(lane.laneId)) return;
+      // The newest pick replaces the oldest, so there are always exactly `need` machines.
+      const order = [...(pickOrder.filter((id) => picked.includes(id))), ...picked.filter((id) => !pickOrder.includes(id))];
+      const drop = picked.length >= need ? order[0] : null;
+      picked = configLanes.map((l) => l.laneId).filter((id) => (id === lane.laneId || picked.includes(id)) && id !== drop);
+      pickOrder = [...order.filter((id) => id !== drop), lane.laneId];
+      rememberPicks();
+      afterPick();
+    });
+    el.machinePicks.append(b);
+    return b;
+  });
+  el.picksNote.textContent = el.machinePicks.hidden
+    ? ""
+    : mode === "head"
+      ? `Pick the two of your ${configLanes.length} machines that race. The one you pick replaces the one picked longest ago.`
+      : `Pick which of your ${configLanes.length} machines runs on its own.`;
+}
+let pickOrder = [];
+
+function afterPick() {
+  for (const b of pickButtons) b.setAttribute("aria-pressed", String(picked.includes(b.dataset.lane)));
+  showLanes(picked);
+  refreshCapacity();
+  refreshMachines();
+  updateSweepNote();
 }
 
 /** HEAD TO HEAD or SOLO. The machine rows under MANAGE MACHINES follow this choice. */
 function chooseMode(next) {
   mode = next;
-  selectedMachine = machineIdFor(mode);
+  settlePicks();
+  pickOrder = [...picked];
+  renderPicks();
   for (const b of machineButtons) b.setAttribute("aria-pressed", String(b.dataset.mode === mode));
-  showLanes(selectedMachine === "all" ? "all" : [selectedMachine]);
+  showLanes(picked);
   refreshCapacity();
   refreshMachines();
   updateSweepNote();
@@ -235,7 +312,9 @@ function chooseMode(next) {
 
 function buildMachines(lanes) {
   configLanes = lanes;
-  selectedMachine = machineIdFor(mode);
+  settlePicks();
+  pickOrder = [...picked];
+  renderPicks();
   el.machines.textContent = "";
   const options = [
     { id: "head", label: "HEAD TO HEAD", title: "two machines race the same prompt at the same instant" },
@@ -263,7 +342,7 @@ let configStreamOptions = [1];
 let capacityAsked = 0;
 
 function selectedLaneIds() {
-  return selectedMachine === "all" ? configLanes.map((l) => l.laneId) : [selectedMachine];
+  return [...picked];
 }
 
 function formatTokens(n) {
@@ -422,7 +501,7 @@ function sweepRunCount() {
 
 function updateSweepNote() {
   const runs = sweepRunCount();
-  const where = selectedMachine === "all" ? "head to head" : "on the machine picked above";
+  const where = mode === "head" ? "head to head" : "on the machine picked above";
   el.sweepNote.textContent = runs > SWEEP_MAX_RUNS
     ? `${runs} races is more than a sweep runs (${SWEEP_MAX_RUNS}). Take something out.`
     : `${sweepSizes.size} size${sweepSizes.size === 1 ? "" : "s"} × ${sweepStreams.size} stream count${sweepStreams.size === 1 ? "" : "s"} × ${sweepRepeats} = ${runs} races, run one after another ${where}. ` +
@@ -735,12 +814,16 @@ async function saveEditor() {
   // Solo changes the first machine only. A machine already saved for head to head is kept only if it
   // still answers, so a leftover that is switched off can never block saving the one machine.
   if (mode === "solo") {
-    savedLanes.slice(1).forEach((l, i) => {
+    savedLanes.slice(1, editorSlots.length).forEach((l, i) => {
       const row = editorSlots[i + 1];
       if (row && row.status.textContent.startsWith("Answered")) {
         lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", engine: l.engine ?? "", watts: l.watts ?? null, slots: l.slots ?? null });
       }
     });
+  }
+  // Machines past the rows shown here (added in race.config.json or with bun run lanes) are kept as they are.
+  for (const l of savedLanes.slice(editorSlots.length)) {
+    lanes.push({ label: l.label, baseUrl: l.baseUrl, notes: l.notes ?? "", engine: l.engine ?? "", watts: l.watts ?? null, slots: l.slots ?? null });
   }
   setEditorBusy(true);
   el.editorStatus.textContent = "Asking every machine, then saving...";
@@ -768,7 +851,7 @@ async function reloadMachines() {
   buildLanes(config.lanes);
   buildMachines(config.lanes);
   resetLanes();
-  showLanes(selectedMachine === "all" ? "all" : [selectedMachine]);
+  showLanes(picked);
   setStreamLayout(selectedStreams);
   updateSweepNote();
   refreshCapacity();
@@ -1157,7 +1240,7 @@ async function startRace() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         preset: selectedPreset,
-        lanes: selectedMachine === "all" ? configLanes.map((l) => l.laneId) : [selectedMachine],
+        lanes: selectedLaneIds(),
         concurrency: selectedStreams,
       }),
     });
@@ -1347,7 +1430,7 @@ async function boot() {
   configStreamOptions = config.concurrencyOptions ?? [1];
   buildStreams(configStreamOptions);
   resetLanes();
-  showLanes(selectedMachine === "all" ? "all" : [selectedMachine]);
+  showLanes(picked);
   setStreamLayout(1);
 
   el.start.addEventListener("click", startRace);

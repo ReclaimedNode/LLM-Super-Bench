@@ -11,6 +11,9 @@ describe("the compare-run-files tab", () => {
     const link = html.match(/<a[^>]*id="compare-files"[^>]*>/)?.[0] ?? "";
     expect(link).toContain('href="/results.html?compare"');
     expect(link).toContain('target="_blank"');
+    // In the header, as its own RESULTS control beside MACHINES.
+    const header = html.slice(html.indexOf('<header class="bar">'), html.indexOf("</header>"));
+    expect(header).toContain('id="compare-files"');
     // Not inside the results bar, which stays hidden until a run finishes.
     const bar = html.slice(html.indexOf('id="resultsbar"'), html.indexOf("</div>", html.indexOf('id="resultsbar"')));
     expect(bar).not.toContain("compare-files");

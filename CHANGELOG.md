@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Head to head now races exactly two machines. With more than two saved, buttons under MACHINES pick which two (and which one for SOLO); the pick is remembered in the browser. Before, head to head raced every saved machine at once. Saving machines from MANAGE MACHINES no longer drops machines past the two rows it shows.
+- COMPARE RUN FILES moved into the header, as a RESULTS control beside MACHINES.
 - **COMPARE RUN FILES** on the race page opens `/results.html?compare`, a results tab that starts empty and shows only the run files you add, so a file someone sent you is not drawn beside this server's latest run unless you add it. On the normal results page, this server's run can now be removed with its × like any other file.
 
 - mlx-vlm and mlx-lm (`mlx_lm.server`) are recognised. mlx-vlm: version (from its `Server` header), loaded model,

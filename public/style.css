@@ -222,6 +222,33 @@ h1 {
   color: var(--nc-black);
 }
 
+.choices .choice-link {
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: clamp(1rem, 1.35vw, 1.6rem);
+  letter-spacing: 0.04em;
+  color: var(--nc-cream);
+  border: 2px solid var(--edge);
+  padding: 0.5em 1em;
+  line-height: 1;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.choices .choice-link:hover {
+  border-color: var(--nc-gold);
+}
+
+/* Which saved machines race: smaller than the mode buttons above them. */
+.choices.picks[hidden] {
+  display: none;
+}
+
+.choices.picks button {
+  font-size: clamp(0.8rem, 0.95vw, 1.1rem);
+  padding: 0.45em 0.8em;
+}
+
 .choices button:disabled {
   opacity: 0.45;
   cursor: default;
@@ -722,8 +749,7 @@ main {
 
 .resultsbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 20px; border: 2px solid var(--edge, #34363a); }
 .resultsbar[hidden] { display: none; }
-.filesbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 20px; border: 2px solid var(--edge, #34363a); border-top: 0; }
-.filesbar a.start { text-decoration: none; display: inline-block; }
+
 .resultsbar a.start { text-decoration: none; display: inline-block; }
 
 .updatebar { padding: 10px 20px; border: 2px solid var(--nc-gold, #f1a21a); font-size: clamp(0.8rem, 0.95vw, 1.05rem); }
