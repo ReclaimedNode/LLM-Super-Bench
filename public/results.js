@@ -8,7 +8,7 @@ const el = {
   addFile: $("add-file"), fileInput: $("file-input"), json: $("download-json"), csv: $("download-csv"),
   picker: $("picker"), size: $("size"), streams: $("streams"), charts: $("charts"),
   setupsPanel: $("setups-panel"), setups: $("setups"),
-  report: $("download-report"), savedRow: $("saved-row"), saved: $("saved-runs"), addSaved: $("add-saved"), versionNote: $("version-note"),
+  report: $("download-report"), pageSub: $("page-sub"), modeNote: $("mode-note"), savedRow: $("saved-row"), saved: $("saved-runs"), addSaved: $("add-saved"), versionNote: $("version-note"),
 };
 
 let collected = [];
@@ -19,6 +19,9 @@ let series = [];
 let size = null;
 let streams = null;
 let serverRaw = null;
+
+// results.html?compare starts empty: only the files you add are drawn, never this server's latest run.
+const compareMode = new URLSearchParams(location.search).has("compare");
 
 function download(name, type, data) {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -113,6 +116,7 @@ function render() {
   series = buildSeries(sources);
   collected = [];
   el.json.disabled = serverRaw === null;
+  el.json.hidden = compareMode;
   el.report.disabled = series.length === 0;
 
   // Files made by different versions of the tool may have been timed by different rules.
@@ -151,7 +155,9 @@ function render() {
   el.picker.hidden = series.length === 0;
   el.setupsPanel.hidden = series.length === 0;
   if (series.length === 0) {
-    el.sourcesNote.textContent = "Nothing to show yet. Run a race or a sweep on the main page, or add a run file from someone else.";
+    el.sourcesNote.textContent = compareMode
+      ? "Nothing to show yet. Press ADD A RUN FILE and pick the file someone sent you. Add more files to draw them side by side."
+      : "Nothing to show yet. Run a race or a sweep on the main page, or add a run file from someone else.";
     return;
   }
   el.sourcesNote.textContent = "";
@@ -341,6 +347,12 @@ async function addFiles(fileList) {
 }
 
 async function boot() {
+  if (compareMode) {
+    document.title = "LLM-Super-Bench · compare run files";
+    el.pageSub.textContent = "COMPARE RUN FILES";
+    el.addFile.textContent = "ADD A RUN FILE";
+    el.modeNote.textContent = "This tab starts empty and shows only the files you add here. Your own latest run is not included; add it from SAVED ON THIS SERVER below if you want it.";
+  }
   try {
     const response = await fetch("/api/last-run");
     if (response.ok) {
@@ -348,7 +360,7 @@ async function boot() {
       const result = readRunFile(JSON.parse(raw));
       if (result.ok) {
         serverRaw = raw;
-        sources.push({ name: "This server", file: result.file, removable: false });
+        if (!compareMode) sources.push({ name: "This server", file: result.file, removable: true });
       }
     }
   } catch {

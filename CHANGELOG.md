@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **COMPARE RUN FILES** on the race page opens `/results.html?compare`, a results tab that starts empty and shows only the run files you add, so a file someone sent you is not drawn beside this server's latest run unless you add it. On the normal results page, this server's run can now be removed with its × like any other file.
+
 - mlx-vlm and mlx-lm (`mlx_lm.server`) are recognised. mlx-vlm: version (from its `Server` header), loaded model,
   MLX bit width, context and whether a speculative drafter is loaded. mlx-lm: model and bit width. A path ending in a
   bit-width folder is shown with its parent (`Foo-MLX/8-bit`, not `8-bit`). Preflight refuses a lane set to a model
