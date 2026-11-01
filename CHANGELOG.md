@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 (2026-11-01)
+
+The first tagged release. The numbers used before it (1.0.0 and 1.1.0 in `package.json`) were never tagged, and
+everything they covered is listed here, newest first. Run files made before this release record version 1.1.0;
+tell them apart by the commit they also record.
 
 - Head to head now races exactly two machines. With more than two saved, buttons under MACHINES pick which two (and which one for SOLO); the pick is remembered in the browser. Before, head to head raced every saved machine at once. Saving machines from MANAGE MACHINES no longer drops machines past the two rows it shows.
 - COMPARE RUN FILES moved into the header, as a RESULTS control beside MACHINES.
@@ -31,11 +35,7 @@
 - The mock server answers `stream: false` requests.
 - `bun run update`: a safe `git pull` that explains itself. It takes what is new, and when you and GitHub both have changes it says so, changes nothing and offers `--merge`, which undoes itself if the two clash. The update banner now points to it. See README, Updating.
 - `bun run quality` prints each machine's name, model and engine (never its address) before it starts.
-
-## 1.1.0
-
 - Fixed: the differences listed under Machine details were dark text on a dark panel and hard to read. They are now light.
-
 - Charts page (`/results.html`) with bar and line charts, SVG and PNG export, a CSV of everything shown, and a
   self-contained HTML report you can post or send. Saved runs on the server can be added from a list.
 - Run files (`.json`) you can share and load beside your own. They carry no addresses.
@@ -49,8 +49,5 @@
   passwords, browser security headers, and a startup warning when no password is set.
 - Update notice (never auto-update) and a README split: the inherited suite's docs moved to `docs/`.
 - Run files and the sweep CSV record the reply length, thinking setting and tool version.
-
-## 1.0.0
-
 - First release as LLM-Super-Bench, based on NetworkChuck's LLM Race harness: solo and head-to-head, selectable prompt
   sizes and stream counts, sweeps with CSV, machine details, editable machines, reply length and thinking controls.
