@@ -31,7 +31,17 @@ export const MAX_TOP_K = 1000;
 /** More than this and the page is asking one machine for more streams than any of these servers has slots. */
 export const MAX_CONCURRENCY_LIMIT = 64;
 
-export const CONFIG_PATH = resolve(PROJECT_ROOT, "race.config.json");
+/**
+ * Where the machines list lives. `RACE_CONFIG=race.config.dsv41.json bun run sweep` points every command at
+ * another file for that run (relative paths are from the project folder), so a second set of machines can
+ * be kept beside the usual one instead of overwriting it.
+ */
+export function configPathFrom(env: Record<string, string | undefined>): string {
+  const chosen = env.RACE_CONFIG?.trim();
+  return resolve(PROJECT_ROOT, chosen ? chosen : "race.config.json");
+}
+
+export const CONFIG_PATH = configPathFrom(process.env);
 export const EXAMPLE_CONFIG_PATH = resolve(PROJECT_ROOT, "race.config.example.json");
 
 function fail(message: string): never {

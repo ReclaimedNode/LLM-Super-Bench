@@ -375,6 +375,36 @@ curl -N -X POST http://localhost:9500/api/sweep -H 'content-type: application/js
   -d '{"presets":["4k","16k"],"concurrencies":[1,2],"repeats":3}'
 ```
 
+## A second set of machines, and a full head to head in one command
+
+`race.config.json` holds the machines you race day to day. To keep another set beside it (a different model, or a
+one-off comparison), put it in its own file and name it with `RACE_CONFIG` for that run. Every command reads it:
+
+```bash
+cp race.config.dsv41.example.json race.config.dsv41.json     # fill in addresses, model ids, notes
+RACE_CONFIG=race.config.dsv41.json RACE_PASSWORD='something-long' bun run race
+RACE_CONFIG=race.config.dsv41.json bun run sweep --sizes 4k --streams 1,4
+```
+
+Files named `race.config.<anything>.json` are gitignored like the main one, so their addresses never reach git.
+
+`scripts/head-to-head.sh` runs the whole set of tests a write-up needs, unattended, as ordinary sweeps and quality runs:
+
+```bash
+RACE_CONFIG=race.config.dsv41.json ./scripts/head-to-head.sh              # speed, long and quality
+RACE_CONFIG=race.config.dsv41.json ./scripts/head-to-head.sh speed        # or any one part
+```
+
+| Part | What runs | Races or questions |
+|---|---|---|
+| `speed` | Short, 4K and 16K prompts at 1, 2, 4, 8 and 16 streams, 3 runs each | 45 races |
+| `long` | 32K and 64K at 1, 2 and 4 streams, 2 runs each; then 128K at 1 stream, 2 runs | 14 races |
+| `quality` | GSM8K (200), IFEval (100), MMLU-Pro (200), long-context at 8K, 32K and 128K | about 560 questions per machine |
+
+Thinking is off by default (`THINKING=off`), so every machine does the same work and PROMPT TOK/S is filled in.
+`MAX_TOKENS` (512), `Q_TOKENS` (2048), `REPEATS` (3) and `MACHINES` change the rest. Everything lands in `results/`
+and on the results page under SAVED ON THIS SERVER. A part that fails is named at the end and the others still run.
+
 ## Engines
 
 Any server with an OpenAI-compatible streaming endpoint can be raced. The machine details panel goes further for engines that report about themselves, and names the engine in the details, the run file, the CSV and the charts:

@@ -1,5 +1,8 @@
 # Real configs hold hostnames, IPs, machine labels and model paths. Never committed.
 race.config.json
+race.config.*.json
+!race.config.example.json
+!race.config.*.example.json
 bench.config.json
 
 # Scratch tsconfig for a local typecheck against types that are not dependencies.

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+- `RACE_CONFIG=<file>` points every command (`race`, `sweep`, `quality`, `lanes`, `init`, the page's saves) at another
+  machines file for that run, so a second set of machines can live beside `race.config.json` instead of replacing it.
+  Relative names are read from the project folder. `race.config.*.json` is gitignored like `race.config.json`;
+  `race.config.*.example.json` files are kept.
+- `scripts/head-to-head.sh` runs a full head to head unattended: short/4K/16K at 1-16 streams, 32K/64K at 1-4 streams,
+  128K at one stream, then GSM8K, IFEval, MMLU-Pro and the long-context test. The grid is split so no sweep passes the
+  60-race limit. Choose parts (`speed`, `long`, `quality`) and settings (`MACHINES`, `THINKING`, `MAX_TOKENS`,
+  `Q_TOKENS`, `REPEATS`) from the command line.
+- `race.config.dsv41.example.json`: a starting point for DeepSeek V4.1 Flash on a vLLM machine against a Mac Studio
+  on oMLX, with long timeouts for 64K and 128K prompts.
+
 ## 1.0.0 (2026-11-01)
 
 The first tagged release. The numbers used before it (1.0.0 and 1.1.0 in `package.json`) were never tagged, and

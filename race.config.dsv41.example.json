@@ -1,0 +1,32 @@
+{
+  "port": 9500,
+  "maxTokens": 512,
+  "temperature": 0,
+  "thinking": "off",
+  "charsPerToken": 4,
+  "promptFile": "prompts/on-liberty-mill.txt",
+  "requestTimeoutMs": 900000,
+  "preflightTimeoutMs": 120000,
+  "maxConcurrency": 16,
+  "lanes": [
+    {
+      "label": "4x CMP 170HX",
+      "baseUrl": "http://<cmp-box>:8000",
+      "model": "<served model name, e.g. dsv41-flash>",
+      "displayModel": "DeepSeek V4.1 Flash",
+      "engine": "vLLM",
+      "slots": 16,
+      "notes": "<quant, vLLM version, TP, --max-num-seqs, speculative settings>"
+    },
+    {
+      "label": "Mac Studio",
+      "baseUrl": "http://<mac-studio>:8000",
+      "model": "<exact id from GET /v1/models>",
+      "displayModel": "DeepSeek V4.1 Flash",
+      "engine": "oMLX",
+      "apiKey": "<oMLX API key>",
+      "slots": 8,
+      "notes": "<quant, oMLX version, --max-concurrent-requests>"
+    }
+  ]
+}
