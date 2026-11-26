@@ -9,6 +9,11 @@ machine, limited to what each machine reports it can run; prompt-processing spee
 repeats, medians and CSV; machine details and setup recorded with every result; a STOP button; a
 password option; editing the machines from the page; `bun run init`; a launchd service file for macOS.
 
+Also added here: sustained streams (the most streams a machine carried cleanly in a sweep) and memory sampling
+during a sweep. Both ideas follow the CROWD test of [Agent Headroom](https://github.com/alexziskind1/agent-headroom)
+(Apache-2.0), which climbs agent counts until a turn fails while sampling host and GPU memory. No code or data
+from that project is used, and these results are not Agent Headroom results.
+
 The measurements, writing, charts and media in the original repository (`data/`, `docs/`, `assets/`,
 `media/`, `site/`) are under their own licences and are not part of this project.
 

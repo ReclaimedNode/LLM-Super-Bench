@@ -43,6 +43,7 @@ const el = {
   sweepTableWrap: document.getElementById("sweep-table-wrap"),
   sweepHead: document.getElementById("sweep-head"),
   sweepRows: document.getElementById("sweep-rows"),
+  sweepSustained: document.getElementById("sweep-sustained"),
   start: document.getElementById("start"),
   stop: document.getElementById("stop"),
   lanes: document.getElementById("lanes"),
@@ -85,6 +86,8 @@ let sweepSizeButtons = [];
 let sweepStreamButtons = [];
 let sweepRepeatButtons = [];
 let sweepWarmupButton = null;
+let sweepMemoryButton = null;
+let sweepMemory = false;
 const sweepSizes = new Set();
 const sweepStreams = new Set([1]);
 let sweepWarmup = true;
@@ -97,6 +100,7 @@ function choiceButtons() {
     ...machineButtons, ...presetButtons, ...streamButtons, ...replyButtons, ...thinkingButtons, ...temperatureButtons,
     ...sweepSizeButtons, ...sweepStreamButtons, ...sweepRepeatButtons,
     ...(sweepWarmupButton ? [sweepWarmupButton] : []),
+    ...(sweepMemoryButton ? [sweepMemoryButton] : []),
   ];
 }
 
@@ -491,6 +495,20 @@ function buildSweepRepeats() {
     return button;
   });
   el.sweepRepeats.append(warm);
+
+  // Memory sampling rides there too. Off by default: it needs ssh from this server to each machine.
+  const memory = document.createElement("button");
+  memory.type = "button";
+  memory.textContent = "MEMORY";
+  memory.title = "sample each machine's host and GPU memory once a second while the races run, over ssh from this server, and add the peaks to the table. A machine that cannot be reached is left blank and the sweep still runs";
+  memory.setAttribute("aria-pressed", String(sweepMemory));
+  memory.addEventListener("click", () => {
+    if (racing) return;
+    sweepMemory = !sweepMemory;
+    memory.setAttribute("aria-pressed", String(sweepMemory));
+  });
+  sweepMemoryButton = memory;
+  el.sweepRepeats.append(memory);
 }
 
 const SWEEP_MAX_RUNS = 60;
@@ -1128,6 +1146,10 @@ function onEvent(event) {
       logLine("Sweep warm-up: one short race that is not counted, so the first measured run is not the one that wakes the model up.");
       break;
 
+    case "sweep-memory":
+      logLine(event.message, event.ok ? undefined : "bad");
+      break;
+
     case "sweep-progress":
       el.sweepStart.textContent = `SWEEP ${event.index}/${event.total}`;
       logLine(
@@ -1138,6 +1160,7 @@ function onEvent(event) {
     case "sweep-done":
       el.resultsBar.hidden = false;
       renderSweepTable(event.rows);
+      renderSustained(event.sustained ?? []);
       sweepCsvText = event.csv;
       el.sweepCsv.hidden = false;
       logLine(
@@ -1306,6 +1329,7 @@ async function startSweep() {
   el.sweepStart.disabled = true;
   el.sweepCsv.hidden = true;
   el.sweepTableWrap.hidden = true;
+  el.sweepSustained.hidden = true;
   sweepCsvText = null;
   for (const b of choiceButtons()) b.disabled = true;
   resetLanes();
@@ -1321,6 +1345,7 @@ async function startSweep() {
         concurrencies: [...sweepStreams].sort((a, b) => a - b),
         repeats: sweepRepeats,
         warmup: sweepWarmup,
+        memory: sweepMemory,
       }),
     });
 
@@ -1354,12 +1379,33 @@ function spreadText(s, digits) {
 
 const SWEEP_COLUMNS = ["SIZE", "STREAMS", "MACHINE", "FIRST WORD (s)", "SPEED", "ALL STREAMS", "PROMPT TOK/S", "TOTAL (s)", "RUNS"];
 
+/** "41.2/128 GB" for the host, then the GPU when the machine has one. The full figures are in the CSV. */
+function memoryCell(m) {
+  if (!m) return "--";
+  const part = (used, total) => `${used.toFixed(1)}/${total.toFixed(0)} GB`;
+  const host = `host ${part(m.hostPeakGb, m.hostTotalGb)}`;
+  return m.gpuPeakGb === null || m.gpuPeakGb === undefined ? host : `${host} · GPU ${part(m.gpuPeakGb, m.gpuTotalGb)}`;
+}
+
+/** One sentence per machine and prompt size: the most streams it carried cleanly, and what stopped the climb. */
+function renderSustained(sustained) {
+  el.sweepSustained.textContent = "";
+  for (const s of sustained) {
+    const li = document.createElement("li");
+    li.textContent = s.sentence;
+    el.sweepSustained.append(li);
+  }
+  el.sweepSustained.hidden = sustained.length === 0;
+}
+
 function renderSweepTable(rows) {
   el.sweepHead.textContent = "";
   el.sweepRows.textContent = "";
 
+  // The memory column is drawn only when memory was sampled, so an ordinary sweep's table is what it always was.
+  const withMemory = rows.some((r) => r.memory);
   const head = document.createElement("tr");
-  for (const name of SWEEP_COLUMNS) {
+  for (const name of withMemory ? [...SWEEP_COLUMNS, "PEAK MEMORY"] : SWEEP_COLUMNS) {
     const th = document.createElement("th");
     th.textContent = name;
     head.append(th);
@@ -1377,7 +1423,8 @@ function renderSweepTable(rows) {
       r.throughput ? `${spreadText(r.throughput, 1)} ${unit}` : "--",
       r.promptSpeed ? Math.round(r.promptSpeed.median).toLocaleString("en-US") : "--",
       spreadText(r.totalSec, 1),
-      `${r.finished}/${r.repeats}`,
+      r.failedStreams > 0 ? `${r.finished}/${r.repeats} (${r.failedStreams} stream${r.failedStreams === 1 ? "" : "s"} failed)` : `${r.finished}/${r.repeats}`,
+      ...(withMemory ? [memoryCell(r.memory)] : []),
     ];
     const tr = document.createElement("tr");
     for (const text of cells) {

@@ -92,6 +92,7 @@ export function mergeLanes(existing: LaneConfig[], edited: EditedLane[], modelId
       if (before.slots !== undefined && e.slots === undefined) kept.slots = before.slots;
       if (before.watts !== undefined && e.watts === undefined) kept.watts = before.watts;
       if (before.extraBody) kept.extraBody = before.extraBody;
+      if (before.ssh) kept.ssh = before.ssh;
     }
     if (kept.displayModel === "") delete kept.displayModel;
     if (typeof e.slots === "number") kept.slots = e.slots;

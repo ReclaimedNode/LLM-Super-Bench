@@ -10,9 +10,13 @@
  */
 
 import type { MachineSetup } from "./details.ts";
+import { mergePeaks } from "./memory.ts";
+import type { MemoryPeak, MemoryStatus } from "./memory.ts";
 import { isPresetId } from "./prompt.ts";
 import { runRace } from "./race.ts";
 import { samplingOf } from "./settings.ts";
+import { sustainedStreams } from "./sustained.ts";
+import type { SustainedRow } from "./sustained.ts";
 import type { RunRaceOptions } from "./race.ts";
 import { laneSpeed, laneThroughput, median, promptSpeed } from "./timing.ts";
 import type { LaneResult, PresetId, RaceEvent } from "./types.ts";
@@ -30,6 +34,8 @@ export interface SweepRequest {
   repeats: number;
   /** One short race first, not in the table, so the first measured run is not the one that wakes the model up. */
   warmup: boolean;
+  /** Sample each machine's memory while the races run (memory.ts). Absent means no. */
+  memory?: boolean;
 }
 
 export type SweepRequestResult = { ok: true; request: SweepRequest } | { ok: false; error: string };
@@ -88,6 +94,12 @@ export function parseSweepRequest(
     warmup = b.warmup;
   }
 
+  let memory = false;
+  if (b.memory !== undefined) {
+    if (typeof b.memory !== "boolean") return { ok: false, error: "Memory sampling must be true or false." };
+    memory = b.memory;
+  }
+
   const runs = presets.length * concurrencies.length * repeats;
   if (runs > MAX_SWEEP_RUNS) {
     return {
@@ -96,7 +108,7 @@ export function parseSweepRequest(
     };
   }
 
-  return { ok: true, request: { laneIds, presets, concurrencies, repeats, warmup } };
+  return { ok: true, request: { laneIds, presets, concurrencies, repeats, warmup, ...(memory ? { memory } : {}) } };
 }
 
 /** The middle of a cell's runs, with the lowest and highest, so the spread is never hidden. */
@@ -133,15 +145,30 @@ export interface SweepRow {
   promptSpeed: Spread | null;
   totalSec: Spread | null;
   promptTokens: number | null;
+  /** Streams that failed, added up over the runs that finished. A run that failed outright is in `finished`, not here. */
+  failedStreams: number;
+  /** Requests the machine runs at once, when that was known. Streams past it waited in its queue. */
+  slots: number | null;
+  /** The most memory the machine used over this cell's runs. Only when the sweep sampled memory and the machine answered. */
+  memory?: MemoryPeak;
 }
 
-/** One cell's runs (each an array of per-lane results) folded into one row per lane. */
-export function summarizeCell(preset: PresetId, concurrency: number, runs: LaneResult[][]): SweepRow[] {
+/**
+ * One cell's runs (each an array of per-lane results) folded into one row per lane.
+ * `memory` is each run's peaks by lane id, in the same order as `runs`, when the sweep sampled it.
+ */
+export function summarizeCell(
+  preset: PresetId,
+  concurrency: number,
+  runs: LaneResult[][],
+  memory: Record<string, MemoryPeak | null>[] = [],
+): SweepRow[] {
   const laneIds = [...new Set(runs.flatMap((run) => run.map((r) => r.laneId)))];
   return laneIds.map((laneId) => {
     const mine = runs.map((run) => run.find((r) => r.laneId === laneId)).filter((r): r is LaneResult => !!r);
     const ok = mine.filter((r) => !r.error && !r.blocked && r.totalSec !== null);
     const speedUnit = ok.length > 0 && ok.every((r) => r.tokens !== null) ? "tokens/sec" : "chunks/sec";
+    const peak = mergePeaks(memory.map((m) => m[laneId]));
     return {
       preset,
       concurrency,
@@ -156,6 +183,10 @@ export function summarizeCell(preset: PresetId, concurrency: number, runs: LaneR
       promptSpeed: spread(ok.map((r) => promptSpeed(r))),
       totalSec: spread(ok.map((r) => r.totalSec)),
       promptTokens: ok.find((r) => r.promptTokens !== null)?.promptTokens ?? null,
+      failedStreams: ok.reduce((sum, r) => sum + (r.failedStreams ?? 0), 0),
+      slots: mine.find((r) => r.slots !== undefined)?.slots ?? null,
+      // Every run counts here, a failed one most of all: it is the one whose memory is worth seeing.
+      ...(peak ? { memory: peak } : {}),
     };
   });
 }
@@ -183,6 +214,13 @@ const CSV_COLUMNS = [
   "total_sec_median",
   "total_sec_min",
   "total_sec_max",
+  "failed_streams",
+  "host_mem_peak_gb",
+  "host_mem_total_gb",
+  "gpu_mem_peak_gb",
+  "gpu_mem_total_gb",
+  "swap_peak_gb",
+  "memory_samples",
   "engine",
   "model_file",
   "quant",
@@ -224,6 +262,13 @@ export function sweepCsv(
       ...trio(r.throughput),
       ...trio(r.promptSpeed),
       ...trio(r.totalSec),
+      r.failedStreams,
+      r.memory?.hostPeakGb ?? null,
+      r.memory?.hostTotalGb ?? null,
+      r.memory?.gpuPeakGb ?? null,
+      r.memory?.gpuTotalGb ?? null,
+      r.memory?.swapPeakGb ?? null,
+      r.memory?.samples ?? null,
       setups[r.laneId]?.engine ?? null,
       setups[r.laneId]?.modelFile ?? null,
       setups[r.laneId]?.quant ?? null,
@@ -257,6 +302,8 @@ export interface SweepProgress {
 export interface SweepDone {
   type: "sweep-done";
   rows: SweepRow[];
+  /** The most streams each machine carried cleanly, per prompt size (sustained.ts). Empty for a sweep of one stream count. */
+  sustained: SustainedRow[];
   csv: string;
   /** False when the sweep ended early: the page was closed, or STOP was pressed. */
   complete: boolean;
@@ -270,7 +317,19 @@ export interface SweepWarmup {
   type: "sweep-warmup";
 }
 
-export type SweepEvent = SweepProgress | SweepDone | SweepWarmup;
+/** Whether one machine's memory sampler answered, said once before the first race. */
+export interface SweepMemory extends MemoryStatus {
+  type: "sweep-memory";
+}
+
+export type SweepEvent = SweepProgress | SweepDone | SweepWarmup | SweepMemory;
+
+/** What a sweep needs from a memory watch. memory.ts's MemoryWatch is one. */
+export interface SweepMemoryWatch {
+  ready(): Promise<MemoryStatus[]>;
+  mark(): number;
+  peaksSince(mark: number): Record<string, MemoryPeak | null>;
+}
 
 export interface RunSweepOptions extends Omit<RunRaceOptions, "preset" | "concurrency" | "emit" | "runId"> {
   request: SweepRequest;
@@ -280,6 +339,11 @@ export interface RunSweepOptions extends Omit<RunRaceOptions, "preset" | "concur
   /** Checked between races: true means the page is gone, so stop. */
   shouldStop?: () => boolean;
   sleep?: (ms: number) => Promise<void>;
+  /**
+   * Each machine's memory, sampled beside the races. The caller starts it and
+   * stops it; the sweep only reads it. Absent means memory is not sampled.
+   */
+  memory?: SweepMemoryWatch;
 }
 
 export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
@@ -294,9 +358,13 @@ export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
     return stoppedByUser || (shouldStop?.() ?? false);
   };
 
+  if (opts.memory) {
+    for (const status of await opts.memory.ready()) emit({ type: "sweep-memory", ...status } satisfies SweepMemory);
+  }
+
   if (request.warmup && !mustStop()) {
     emit({ type: "sweep-warmup" } satisfies SweepWarmup);
-    const { request: _r, emit: _e, pauseMs: _p, shouldStop: _s, sleep: _sl, ...raceOptions } = opts;
+    const { request: _r, emit: _e, pauseMs: _p, shouldStop: _s, sleep: _sl, memory: _m, ...raceOptions } = opts;
     // Not logged and not in the table: it exists only to be thrown away.
     await runRace({ ...raceOptions, logPath: null, laneIds: request.laneIds, preset: "short", concurrency: 1, emit });
     if (pauseMs > 0) await sleep(pauseMs);
@@ -305,6 +373,7 @@ export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
   outer: for (const preset of request.presets) {
     for (const concurrency of request.concurrencies) {
       const runs: LaneResult[][] = [];
+      const peaks: Record<string, MemoryPeak | null>[] = [];
       for (let repeat = 1; repeat <= request.repeats; repeat++) {
         if (mustStop()) {
           complete = false;
@@ -313,7 +382,8 @@ export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
         if (index > 0 && pauseMs > 0) await sleep(pauseMs);
         index++;
         emit({ type: "sweep-progress", index, total, preset, concurrency, repeat, repeats: request.repeats } satisfies SweepProgress);
-        const { request: _r, emit: _e, pauseMs: _p, shouldStop: _s, sleep: _sl, ...raceOptions } = opts;
+        const { request: _r, emit: _e, pauseMs: _p, shouldStop: _s, sleep: _sl, memory: _m, ...raceOptions } = opts;
+        const mark = opts.memory?.mark();
         const outcome = await runRace({
           ...raceOptions,
           laneIds: request.laneIds,
@@ -329,9 +399,10 @@ export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
           break;
         }
         runs.push(outcome.results);
+        if (opts.memory && mark !== undefined) peaks.push(opts.memory.peaksSince(mark));
       }
       // A cell stopped part way still reports the runs it did get to.
-      if (runs.length > 0) rows.push(...summarizeCell(preset, concurrency, runs));
+      if (runs.length > 0) rows.push(...summarizeCell(preset, concurrency, runs, peaks));
       if (!complete) break outer;
     }
   }
@@ -339,6 +410,7 @@ export async function runSweep(opts: RunSweepOptions): Promise<SweepDone> {
   const done: SweepDone = {
     type: "sweep-done",
     rows,
+    sustained: sustainedStreams(rows),
     csv: sweepCsv(rows, opts.laneSetups, { maxTokens: opts.config.maxTokens, thinking: opts.config.thinking ?? "auto", ...samplingOf(opts.config) }),
     complete,
     ...(stoppedByUser ? { stopped: true } : {}),

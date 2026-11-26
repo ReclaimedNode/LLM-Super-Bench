@@ -47,6 +47,11 @@ export interface LaneConfig {
    * to chart speed per watt; the tool does not measure power itself.
    */
   watts?: number;
+  /**
+   * How to reach this machine over ssh, for `bun run lanes` and for sampling its memory during a sweep.
+   * Every part is optional: the host defaults to the one in `baseUrl`, the user and port to ssh's own.
+   */
+  ssh?: { host?: string; user?: string; sshPort?: number; binDir?: string };
 }
 
 export interface RaceConfig {

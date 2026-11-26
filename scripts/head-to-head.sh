@@ -18,6 +18,8 @@
 #   MAX_TOKENS   reply length for the speed parts (default 512)
 #   Q_TOKENS     reply length for the quality parts (default 2048)
 #   REPEATS      runs per cell for the speed part (default 3)
+#   MEMORY       on to sample each machine's host and GPU memory during the speed and long sweeps
+#                (needs ssh from this machine to each one; default off)
 #
 # A sweep is capped at 60 races, which is why the grid is split into parts. Each part exits on its own
 # failure without stopping the parts after it; the summary at the end says which ones did not finish.
@@ -40,6 +42,8 @@ fi
 
 machines=()
 [ -n "${MACHINES:-}" ] && machines=(--machines "$MACHINES")
+memory=()
+[ "${MEMORY:-off}" = on ] && memory=(--memory)
 failed=()
 
 step() {
@@ -59,15 +63,15 @@ for part in "${PARTS[@]}"; do
     speed)
       step "speed: short/4K/16K x 1-16 streams" \
         bun run sweep --sizes short,4k,16k --streams 1,2,4,8,16 --repeats "$REPEATS" \
-          --thinking "$THINKING" --max-tokens "$MAX_TOKENS" "${machines[@]}"
+          --thinking "$THINKING" --max-tokens "$MAX_TOKENS" "${machines[@]}" ${memory[@]+"${memory[@]}"}
       ;;
     long)
       step "long: 32K/64K x 1,2,4 streams" \
         bun run sweep --sizes 32k,64k --streams 1,2,4 --repeats 2 \
-          --thinking "$THINKING" --max-tokens "$MAX_TOKENS" "${machines[@]}"
+          --thinking "$THINKING" --max-tokens "$MAX_TOKENS" "${machines[@]}" ${memory[@]+"${memory[@]}"}
       step "long: 128K x 1 stream" \
         bun run sweep --sizes 128k --streams 1 --repeats 2 --no-warmup \
-          --thinking "$THINKING" --max-tokens "$MAX_TOKENS" "${machines[@]}"
+          --thinking "$THINKING" --max-tokens "$MAX_TOKENS" "${machines[@]}" ${memory[@]+"${memory[@]}"}
       ;;
     quality)
       for s in gsm8k mmlu-pro; do

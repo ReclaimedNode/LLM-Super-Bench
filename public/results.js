@@ -1,5 +1,5 @@
 import {
-  METRICS, barChartSvg, esc, buildSeries, cells, lineChartSvg, presetLabel, readRunFile, rowAt, rowsToCsv, samplingText, MAX_FILE_BYTES,
+  METRICS, barChartSvg, esc, buildSeries, cells, lineChartSvg, memoryText, presetLabel, readRunFile, rowAt, rowsToCsv, samplingText, MAX_FILE_BYTES,
 } from "/charts.js";
 
 const $ = (id) => document.getElementById(id);
@@ -8,6 +8,7 @@ const el = {
   addFile: $("add-file"), fileInput: $("file-input"), json: $("download-json"), csv: $("download-csv"),
   picker: $("picker"), size: $("size"), streams: $("streams"), charts: $("charts"),
   setupsPanel: $("setups-panel"), setups: $("setups"),
+  sustainedPanel: $("sustained-panel"), sustained: $("sustained"),
   report: $("download-report"), pageSub: $("page-sub"), modeNote: $("mode-note"), savedRow: $("saved-row"), saved: $("saved-runs"), addSaved: $("add-saved"), versionNote: $("version-note"),
 };
 
@@ -154,6 +155,7 @@ function render() {
   el.charts.textContent = "";
   el.picker.hidden = series.length === 0;
   el.setupsPanel.hidden = series.length === 0;
+  el.sustainedPanel.hidden = true;
   if (series.length === 0) {
     el.sourcesNote.textContent = compareMode
       ? "Nothing to show yet. Press ADD A RUN FILE and pick the file someone sent you. Add more files to draw them side by side."
@@ -235,6 +237,29 @@ function render() {
     el.charts.append(p);
   }
 
+  // Sustained streams, for the sweeps that ran more than one stream count.
+  const sustained = sustainedRows();
+  el.sustained.textContent = "";
+  el.sustainedPanel.hidden = sustained.length === 0;
+  if (sustained.length > 0) {
+    const top = document.createElement("tr");
+    for (const h of SUSTAINED_HEAD) {
+      const th = document.createElement("th");
+      th.textContent = h;
+      top.append(th);
+    }
+    el.sustained.append(top);
+    for (const cells of sustained) {
+      const tr = document.createElement("tr");
+      for (const v of cells) {
+        const td = document.createElement("td");
+        td.textContent = String(v);
+        tr.append(td);
+      }
+      el.sustained.append(tr);
+    }
+  }
+
   // Setups.
   el.setups.textContent = "";
   const head = document.createElement("tr");
@@ -256,6 +281,23 @@ function render() {
   }
 }
 
+const SUSTAINED_HEAD = ["MACHINE", "FROM", "PROMPT", "SUSTAINED STREAMS", "WHAT HAPPENED", "PEAK MEMORY AT THAT COUNT"];
+
+/** One line per machine, source and prompt size that a sweep climbed. Shared by the page and the report. */
+function sustainedRows() {
+  const out = [];
+  for (const s of series) {
+    for (const u of s.file.sustained ?? []) {
+      if (u.label !== s.label) continue;
+      // "at least" when nothing failed: the sweep stopped climbing, the machine did not.
+      const figure = u.sustained === null ? "none" : u.stoppedAt === null ? `at least ${u.sustained}` : String(u.sustained);
+      const at = u.sustained === null ? null : rowAt(s, u.preset, u.sustained);
+      out.push([s.display, s.source, presetLabel(u.preset), figure, u.sentence, memoryText(at?.memory ?? null)]);
+    }
+  }
+  return out;
+}
+
 /** One self-contained page: charts, setup table, no scripts, nothing fetched. Every string is escaped. */
 function buildReport() {
   const when = new Date().toISOString().slice(0, 16).replace("T", " ");
@@ -271,6 +313,8 @@ function buildReport() {
     return `<tr>${cells.map((c) => `<td>${esc(c ?? "")}</td>`).join("")}</tr>`;
   }).join("");
   const head = ["MACHINE", "FROM", "ENGINE", "MODEL", "QUANT", "BUILD", "SLOTS", "REPLY LENGTH", "THINKING", "SAMPLING", "WATTS", "NOTES"].map((h) => `<th>${h}</th>`).join("");
+  const sustained = sustainedRows();
+  const sustainedHtml = sustained.length === 0 ? "" : `<h2>SUSTAINED STREAMS</h2><p class="note">The most streams each machine carried with every run finished and no stream failed. It says nothing about speed.</p><div class="t"><table><tr>${SUSTAINED_HEAD.map((h) => `<th>${h}</th>`).join("")}</tr>${sustained.map((cells) => `<tr>${cells.map((c) => `<td>${esc(c ?? "")}</td>`).join("")}</tr>`).join("")}</table></div>`;
   const body = groups.map((g) => `<h2>${esc(g.name)}</h2><div class="grid">${g.items.map((i) => `<figure>${i.svg}</figure>`).join("")}</div>`).join("");
   const tools = [...new Set(sources.map((s) => (s.file.tool ? `${s.file.tool.version}${s.file.tool.commit ? ` (${s.file.tool.commit.slice(0, 7)})` : ""}` : "")).filter(Boolean))];
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>LLM-Super-Bench report</title><style>
@@ -281,7 +325,7 @@ figure{margin:0}svg{max-width:100%;height:auto}.t{overflow-x:auto}table{border-c
 th,td{text-align:left;padding:6px 10px;border-bottom:1px solid #34363a;vertical-align:top}th{color:#a9a79d;font-size:.72rem;letter-spacing:.08em}
 </style></head><body><main><h1>LLM-Super-Bench report</h1>
 <p class="note">Made ${esc(when)} from: ${esc(sources.map((s) => s.name).join(", "))}${tools.length ? ` · tool ${esc(tools.join(", "))}` : ""}. Speed per watt uses watts the person entered; it is not measured.</p>
-${body}<h2>HOW EACH MACHINE WAS SET UP</h2><div class="t"><table><tr>${head}</tr>${rows}</table></div>
+${body}${sustainedHtml}<h2>HOW EACH MACHINE WAS SET UP</h2><div class="t"><table><tr>${head}</tr>${rows}</table></div>
 <p class="note">Made with LLM-Super-Bench, based on NetworkChuck's harness (MIT): github.com/reclaimednode/LLM-Super-Bench</p></main></body></html>`;
 }
 

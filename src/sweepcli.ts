@@ -7,6 +7,10 @@
  *   bun run sweep --sizes short,4k,16k --streams 1,2,4 --repeats 3
  *   bun run sweep --machines "Mac Studio,CMP 170HX" --thinking low --max-tokens 1024
  *   bun run sweep --temperature 0.7 --top-p 0.95 --top-k 20
+ *   bun run sweep --streams 1,2,4,8 --memory
+ *
+ * --memory samples each machine's host and GPU memory over ssh while the races run (see memory.ts),
+ * and adds the peaks to the table, the CSV and the run file.
  *
  * --temperature, --top-p and --top-k apply to this sweep only and are saved with its results; they do
  * not change race.config.json. --top-p none / --top-k none leave that setting to each server.
@@ -19,6 +23,7 @@ import { resolve } from "node:path";
 import { setupFor } from "./asked.ts";
 import { PROJECT_ROOT, loadConfig, loadPromptSource } from "./config.ts";
 import { readLanesState, withServedModels } from "./lanes.ts";
+import { peakText, watchMemory } from "./memory.ts";
 import { PRESET_IDS } from "./prompt.ts";
 import { buildRunFile } from "./runfile.ts";
 import { saveRun } from "./runstore.ts";
@@ -32,6 +37,8 @@ export interface SweepArgs {
   concurrencies: number[];
   repeats: number;
   warmup: boolean;
+  /** Sample each machine's memory while the races run. */
+  memory: boolean;
   machines: string[] | null;
   maxTokens?: number;
   thinking?: "auto" | "low" | "off";
@@ -48,7 +55,7 @@ const list = (v: string) => v.split(",").map((s) => s.trim()).filter((s) => s !=
 
 /** Turns the command line into a sweep. Pure, so it can be tested. */
 export function parseSweepArgs(argv: string[]): { ok: true; args: SweepArgs } | { ok: false; error: string } {
-  const args: SweepArgs = { presets: ["short", "4k"], concurrencies: [1], repeats: 1, warmup: true, machines: null };
+  const args: SweepArgs = { presets: ["short", "4k"], concurrencies: [1], repeats: 1, warmup: true, memory: false, machines: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i]!;
     const next = () => argv[++i];
@@ -58,12 +65,13 @@ export function parseSweepArgs(argv: string[]): { ok: true; args: SweepArgs } | 
       case "--repeats": args.repeats = Number(next()); break;
       case "--machines": args.machines = list(next() ?? ""); break;
       case "--no-warmup": args.warmup = false; break;
+      case "--memory": args.memory = true; break;
       case "--max-tokens": args.maxTokens = Number(next()); break;
       case "--thinking": args.thinking = next() as SweepArgs["thinking"]; break;
       case "--temperature": args.temperature = Number(next()); break;
       case "--top-p": args.topP = sampled(next()); break;
       case "--top-k": args.topK = sampled(next()); break;
-      default: return { ok: false, error: `Unknown option ${a}. Options: --sizes, --streams, --repeats, --machines, --no-warmup, --max-tokens, --thinking, --temperature, --top-p, --top-k.` };
+      default: return { ok: false, error: `Unknown option ${a}. Options: --sizes, --streams, --repeats, --machines, --no-warmup, --memory, --max-tokens, --thinking, --temperature, --top-p, --top-k.` };
     }
   }
   const badSize = args.presets.find((p) => !(PRESET_IDS as string[]).includes(p));
@@ -127,7 +135,7 @@ async function main(): Promise<number> {
     return 2;
   }
   const request = parseSweepRequest(
-    { lanes: picked.ids, presets: args.presets, concurrencies: args.concurrencies, repeats: args.repeats, warmup: args.warmup },
+    { lanes: picked.ids, presets: args.presets, concurrencies: args.concurrencies, repeats: args.repeats, warmup: args.warmup, memory: args.memory },
     { laneIds: config.lanes.map((_, i) => `lane-${i}`), maxConcurrency: config.maxConcurrency ?? 16 },
   );
   if (!request.ok) {
@@ -149,14 +157,18 @@ async function main(): Promise<number> {
   const tool = await toolInfo();
   let finishedOk = false;
   let saving: Promise<void> = Promise.resolve();
+  const memory = request.request.memory ? watchMemory(raceConfig.lanes, request.request.laneIds) : undefined;
 
+  try {
   await runSweep({
     config: raceConfig,
     sourceText,
     request: request.request,
     laneSlots: Math.max(...request.request.concurrencies) > 1 ? asked.slots : {},
     laneSetups: asked.setups,
+    ...(memory ? { memory } : {}),
     emit: (event) => {
+      if (event.type === "sweep-memory") (event.ok ? console.log : console.error)(event.message);
       if (event.type === "sweep-warmup") console.log("Warm-up race (not counted)...");
       if (event.type === "sweep-progress") console.log(`[${event.index}/${event.total}] ${event.preset}, ${event.concurrency} stream(s), run ${event.repeat}/${event.repeats}`);
       if (event.type !== "sweep-done") return;
@@ -179,11 +191,24 @@ async function main(): Promise<number> {
           }),
         );
         console.log(`\n${event.complete ? "Sweep finished." : "Sweep ended early; the table covers the races that finished."}`);
+        if (event.rows.some((r) => r.memory)) {
+          console.log("\nPeak memory while each cell ran:");
+          for (const r of event.rows) {
+            if (r.memory) console.log(`  ${r.preset}, ${r.concurrency} stream(s), ${r.label}: ${peakText(r.memory)}`);
+          }
+        }
+        if (event.sustained.length > 0) {
+          console.log("\nSustained streams:");
+          for (const s of event.sustained) console.log(`  ${s.sentence}`);
+        }
         console.log(`Saved results/sweep-${stamp}.csv${name ? ` and results/${name}` : ""}.`);
         console.log("Open the page and press VIEW CHARTS, or load the .json on the results page.");
       })();
     },
   });
+  } finally {
+    memory?.stop();
+  }
   await saving;
   return finishedOk ? 0 : 1;
 }

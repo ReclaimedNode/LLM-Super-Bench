@@ -124,6 +124,16 @@ export function validateConfig(raw: unknown): RaceConfig {
       }
       if (lane.engine.trim() !== "") out.engine = lane.engine.trim();
     }
+    if (typeof lane.ssh === "object" && lane.ssh !== null && !Array.isArray(lane.ssh)) {
+      // Kept as written. Each value is checked again where it is used: nothing reaches a remote shell unchecked.
+      const raw = lane.ssh as Record<string, unknown>;
+      const ssh: NonNullable<LaneConfig["ssh"]> = {};
+      if (typeof raw.host === "string" && raw.host !== "") ssh.host = raw.host;
+      if (typeof raw.user === "string" && raw.user !== "") ssh.user = raw.user;
+      if (typeof raw.binDir === "string" && raw.binDir !== "") ssh.binDir = raw.binDir;
+      if (typeof raw.sshPort === "number" && Number.isInteger(raw.sshPort) && raw.sshPort >= 1 && raw.sshPort <= 65535) ssh.sshPort = raw.sshPort;
+      if (Object.keys(ssh).length > 0) out.ssh = ssh;
+    }
     return out;
   });
 

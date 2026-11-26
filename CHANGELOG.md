@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+- **Sustained streams.** A sweep over two or more stream counts now ends with the most streams each machine carried
+  cleanly at each prompt size: every run finished, no stream failed, and no more streams than the machine runs at once.
+  The climb stops at the first stream count that was not clean and says what was wrong there. When nothing failed the
+  figure is said as "at least". Shown under the sweep table, printed by `bun run sweep`, saved in the run file
+  (`sustained`) and listed on the results page and in the downloaded report.
+- **Memory during a sweep.** MEMORY in the sweep panel, `bun run sweep --memory`, or `MEMORY=on` for
+  `scripts/head-to-head.sh` samples each machine's host and GPU memory once a second while the races run, over ssh,
+  with a read-only loop and nothing installed (Linux: `/proc/meminfo` and `nvidia-smi`; macOS: `vm_stat`). Each row
+  carries the peak over its runs. New PEAK MEMORY column, two results-page charts (host and GPU memory at peak), and
+  the memory at a failing stream count is stated in the sustained-streams sentence. A machine that cannot be sampled
+  is named with the reason and left blank; the sweep is not affected. Off by default.
+- Sweep rows, the sweep CSV and the results page's CSV gain `failed_streams`, `host_mem_peak_gb`, `host_mem_total_gb`,
+  `gpu_mem_peak_gb`, `gpu_mem_total_gb`, `swap_peak_gb` and `memory_samples`, placed after the total-time columns and
+  before `engine`. Anything reading the CSV by column position after `total_sec_max` needs to read by name instead.
+  The RUNS column says when streams failed inside a run that finished.
+- A machine's `ssh` block (`host`, `user`, `sshPort`, `binDir`) in `race.config.json` is now kept when the config is
+  loaded and when machines are saved from the page. Before, saving from the page dropped it.
+
 - `RACE_CONFIG=<file>` points every command (`race`, `sweep`, `quality`, `lanes`, `init`, the page's saves) at another
   machines file for that run, so a second set of machines can live beside `race.config.json` instead of replacing it.
   Relative names are read from the project folder. `race.config.*.json` is gitignored like `race.config.json`;

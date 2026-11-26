@@ -10,6 +10,8 @@ import { baseName } from "./details.ts";
 import type { MachineSetup } from "./details.ts";
 import { summarizeCell } from "./sweep.ts";
 import type { SweepRow } from "./sweep.ts";
+import { sustainedStreams } from "./sustained.ts";
+import type { SustainedRow } from "./sustained.ts";
 import type { LaneResult, PresetId } from "./types.ts";
 
 export const RUN_FORMAT = "llm-super-bench-run";
@@ -42,6 +44,8 @@ export interface RunFile {
   tool?: { version: string; commit: string | null };
   machines: RunFileMachine[];
   rows: SweepRow[];
+  /** The most streams each machine carried cleanly, per prompt size. Only in a sweep over several stream counts. */
+  sustained?: SustainedRow[];
 }
 
 export interface BuildRunFileOptions {
@@ -60,6 +64,8 @@ export interface BuildRunFileOptions {
 
 export function buildRunFile(o: BuildRunFileOptions): RunFile {
   const used = new Set(o.rows.map((r) => r.laneId));
+  // Worked out from the rows here, so the file cannot carry a figure its own rows do not support.
+  const sustained = sustainedStreams(o.rows);
   return {
     format: RUN_FORMAT,
     version: RUN_VERSION,
@@ -84,6 +90,7 @@ export function buildRunFile(o: BuildRunFileOptions): RunFile {
         ...(l.watts !== undefined ? { watts: l.watts } : {}),
       })),
     rows: o.rows,
+    ...(sustained.length > 0 ? { sustained } : {}),
   };
 }
 

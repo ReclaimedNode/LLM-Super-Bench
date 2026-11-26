@@ -28,6 +28,7 @@ import { concurrencyOptions } from "./streams.ts";
 import { REPLY_LENGTHS, TEMPERATURES, applySettings, parseSettings, samplingOf, samplingWarning } from "./settings.ts";
 import { buildRunFile, hasFinishedRun, raceRows } from "./runfile.ts";
 import type { RunFile } from "./runfile.ts";
+import { watchMemory } from "./memory.ts";
 import { parseSweepRequest, runSweep } from "./sweep.ts";
 import type { SweepEvent } from "./sweep.ts";
 import type { RaceEvent } from "./types.ts";
@@ -460,7 +461,11 @@ async function handle(req: Request, client: string): Promise<Response> {
       }
 
       return eventStream(async (emit, isOpen, signal) => {
+        // Started here and stopped in the finally below, so a sweep that throws cannot leave a sampler running.
+        const memory = request.memory ? watchMemory(raceConfig.lanes, request.laneIds) : undefined;
+        try {
         const done = await runSweep({
+          ...(memory ? { memory } : {}),
           signal,
           config: raceConfig,
           sourceText,
@@ -493,6 +498,9 @@ async function handle(req: Request, client: string): Promise<Response> {
           },
         });
         void done;
+        } finally {
+          memory?.stop();
+        }
       });
     }
 

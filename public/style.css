@@ -155,6 +155,14 @@ h1 {
   letter-spacing: 0.08em;
 }
 
+/* Under the sweep table: the most streams each machine carried cleanly, one sentence each. */
+.sweep-sustained {
+  margin: 0.8rem 0 0;
+  padding-left: 1.2em;
+  font-size: clamp(0.75rem, 0.95vw, 1rem);
+  line-height: 1.5;
+}
+
 /* The prompt-processing line under a finished lane. */
 .prompt-note {
   margin: 0.4rem 0 0;

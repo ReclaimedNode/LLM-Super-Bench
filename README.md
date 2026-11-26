@@ -358,7 +358,8 @@ and machine, the **median** of its runs with the lowest and highest in brackets:
 | ALL STREAMS | every stream together, only with more than one stream |
 | PROMPT TOK/S | prompt tokens ÷ seconds to first word. Blank where that would be a guess: several streams, a thinking model, a cache hit, no usage report, or a prompt under 500 tokens |
 | TOTAL | seconds until everything finished |
-| RUNS | runs finished / runs asked for. A failed run is left out of the medians, not counted as zero |
+| RUNS | runs finished / runs asked for. A failed run is left out of the medians, not counted as zero. Streams that failed inside a finished run are counted beside it |
+| PEAK MEMORY | only when MEMORY is on: the most host and GPU memory in use over the cell's runs, against the total |
 
 **WARM-UP** (on by default) runs one short race first and throws it away, so the first measured
 run is not the one that wakes the model up. It is not in the table or in `runs.jsonl`.
@@ -374,6 +375,59 @@ The same thing over HTTP, without the page:
 curl -N -X POST http://localhost:9500/api/sweep -H 'content-type: application/json' \
   -d '{"presets":["4k","16k"],"concurrencies":[1,2],"repeats":3}'
 ```
+
+### Sustained streams
+
+A sweep over two or more stream counts ends with one more line per machine and prompt size: the most streams it
+**sustained**. The tool climbs the stream counts the sweep ran, fewest first, and stops at the first one that was not
+clean. A stream count is clean when every run finished, no stream failed, and the machine was not asked for more than it
+runs at once (streams past that wait in its queue, so they are not running together).
+
+```
+CMP 170HX sustained 4 streams at 16k: at 8, 2 of 24 streams failed. Memory at 8: host 30.4 of 32.0 GB (95%).
+Mac Studio sustained 16 streams at 16k, the most this sweep asked for, so its limit is at least that.
+```
+
+- When nothing failed, the figure is the top of the sweep and is said as "at least". It is not a limit.
+- It says nothing about speed. A machine can sustain 16 streams that each crawl, so read it beside ALL STREAMS.
+- The table's RUNS column and the CSV's `failed_streams` column show the failed streams it was worked out from.
+- It is shown under the sweep table, printed by `bun run sweep`, saved in the run file, and listed on the results page
+  under SUSTAINED STREAMS.
+
+### Memory during a sweep
+
+Turn on **MEMORY** in the sweep panel (or `bun run sweep --memory`) and each machine's memory is sampled once a second
+while the races run. Each row then carries the **peak** over its runs: host memory used and total, GPU memory used and
+total (every card together), and swap. They appear in a PEAK MEMORY column, in the CSV (`host_mem_peak_gb`,
+`host_mem_total_gb`, `gpu_mem_peak_gb`, `gpu_mem_total_gb`, `swap_peak_gb`, `memory_samples`), in the run file, and as
+two charts on the results page. When a stream count fails, the sustained-streams sentence states the memory at that
+count beside it.
+
+How it reads them: the computer running this tool opens one ssh connection to each machine for the length of the sweep
+and runs a small read-only loop there. Nothing is installed and nothing is written.
+
+| Machine | Host memory | GPU memory |
+|---|---|---|
+| Linux | `/proc/meminfo`: MemTotal minus MemAvailable | `nvidia-smi`, summed over the cards. Blank without it |
+| macOS | `vm_stat`: active + wired + compressor pages | Blank: on Apple silicon GPU memory is host memory |
+
+What it needs, and what happens without it:
+
+- **ssh with a key**, from the computer running the tool to each machine, with no password prompt (`ssh <host> true`
+  should just return). The host is the one in the machine's address. To use another host name, user or port, put
+  `"ssh": { "host": "studio.local", "user": "bench", "sshPort": 22 }` on the machine in `race.config.json`.
+- A machine that cannot be reached, or runs something other than Linux or macOS, is named in the log with the reason,
+  its memory columns are left blank, and **the sweep runs exactly as it would have**. A blank is never a zero.
+- A machine at this computer's own address (`localhost`) is sampled directly, with no ssh.
+
+What the numbers are not:
+
+- They are the whole machine, not the model server alone. Anything else running there is in them.
+- Samples are a second apart, so a race shorter than a few seconds has one or two (`memory_samples` says how many), and
+  a spike between two samples is missed.
+- On macOS, "used" is the usual active + wired + compressor reading, which is close to Activity Monitor's Memory Used
+  but not identical to it.
+- The warm-up race is not sampled, and an ordinary race outside a sweep is not either.
 
 ## A second set of machines, and a full head to head in one command
 
@@ -402,7 +456,8 @@ RACE_CONFIG=race.config.dsv41.json ./scripts/head-to-head.sh speed        # or a
 | `quality` | GSM8K (200), IFEval (100), MMLU-Pro (200), long-context at 8K, 32K and 128K | about 560 questions per machine |
 
 Thinking is off by default (`THINKING=off`), so every machine does the same work and PROMPT TOK/S is filled in.
-`MAX_TOKENS` (512), `Q_TOKENS` (2048), `REPEATS` (3) and `MACHINES` change the rest. Everything lands in `results/`
+`MAX_TOKENS` (512), `Q_TOKENS` (2048), `REPEATS` (3) and `MACHINES` change the rest. `MEMORY=on` samples each machine's
+memory during the speed and long sweeps (see [Memory during a sweep](#memory-during-a-sweep)). Everything lands in `results/`
 and on the results page under SAVED ON THIS SERVER. A part that fails is named at the end and the others still run.
 
 ## Engines
@@ -471,7 +526,7 @@ bun run sweep --machines "Mac Studio,CMP 170HX" --thinking low --max-tokens 1024
 bun run probe http://192.168.1.50:8000                              # what a machine's status addresses say
 ```
 
-`bun run sweep` writes the CSV and the shareable run file to `results/`, then you open the page (or the results page) to see the charts. Options: `--sizes`, `--streams`, `--repeats`, `--machines` (by name), `--no-warmup`, `--thinking auto|low|off`, `--max-tokens`, and `--temperature` / `--top-p` / `--top-k` for that sweep only (see Sampling). It exits 0 when the sweep finished, so it fits a scheduled job.
+`bun run sweep` writes the CSV and the shareable run file to `results/`, then you open the page (or the results page) to see the charts. Options: `--sizes`, `--streams`, `--repeats`, `--machines` (by name), `--no-warmup`, `--memory`, `--thinking auto|low|off`, `--max-tokens`, and `--temperature` / `--top-p` / `--top-k` for that sweep only (see Sampling). It exits 0 when the sweep finished, so it fits a scheduled job.
 
 `bun run probe` is read-only (it only sends GET requests). Use it when MACHINE DETAILS says "not reported": the output masks addresses and home folders and is safe to paste into an issue.
 
@@ -713,6 +768,8 @@ src/editor.ts       changing the machines from the page: check an address, save 
 src/init.ts         `bun run init`: writes race.config.json from the machines' own answers
 src/details.ts      what each machine reports about itself, and where they differ
 src/sweep.ts        sweeps: a grid of races, medians per cell, CSV
+src/sustained.ts    the most streams each machine carried cleanly in a sweep
+src/memory.ts       each machine's host and GPU memory, sampled over ssh while a sweep runs
 src/auth.ts         the optional page password
 src/streams.ts      several streams of one lane folded into one result; the stream-count options
 src/request.ts      what the page may ask a race for: machines, size, streams

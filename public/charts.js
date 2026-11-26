@@ -53,6 +53,8 @@ export const METRICS = [
   { key: "promptSpeed", label: "Prompt speed", unit: () => "prompt tokens/sec", lowerBetter: false, digits: 0, note: "Prompt tokens divided by seconds to the first word. Higher is better. Blank when it would be a guess." },
   { key: "efficiency", label: "Efficiency", unit: () => "tokens/sec per watt", lowerBetter: false, digits: 2, note: "Speed divided by the watts you entered. Higher is better." },
   { key: "totalSec", label: "Total time", unit: () => "seconds", lowerBetter: true, digits: 2, note: "Seconds from sending the request to the last word. Lower is better." },
+  { key: "hostMemory", label: "Host memory at peak", unit: () => "GB", lowerBetter: true, digits: 1, note: "The most host memory the machine had in use while this ran, everything on it included. Not a score." },
+  { key: "gpuMemory", label: "GPU memory at peak", unit: () => "GB", lowerBetter: true, digits: 1, note: "The most GPU memory in use while this ran, every card together. Not a score." },
 ];
 
 // ---------------------------------------------------------------- run files
@@ -68,6 +70,36 @@ function cleanSpread(s) {
   const median = finite(s.median);
   if (median === null) return null;
   return { median, min: finite(s.min) ?? median, max: finite(s.max) ?? median };
+}
+
+/** A row's memory peak, when the sweep sampled memory. Every number is checked; anything odd means no memory. */
+function cleanMemory(m) {
+  if (!m || typeof m !== "object") return null;
+  const hostPeakGb = finite(m.hostPeakGb);
+  const hostTotalGb = finite(m.hostTotalGb);
+  if (hostPeakGb === null || hostTotalGb === null || hostPeakGb < 0 || hostTotalGb <= 0) return null;
+  const gpuPeakGb = finite(m.gpuPeakGb);
+  const gpuTotalGb = finite(m.gpuTotalGb);
+  const gpu = gpuPeakGb !== null && gpuTotalGb !== null && gpuPeakGb >= 0 && gpuTotalGb > 0;
+  return {
+    samples: Math.max(0, Math.floor(finite(m.samples) ?? 0)),
+    hostPeakGb,
+    hostTotalGb,
+    gpuPeakGb: gpu ? gpuPeakGb : null,
+    gpuTotalGb: gpu ? gpuTotalGb : null,
+    gpus: gpu ? Math.max(1, Math.floor(finite(m.gpus) ?? 1)) : 0,
+    swapPeakGb: finite(m.swapPeakGb),
+  };
+}
+const flat = (v) => (v === null ? null : { median: v, min: v, max: v });
+
+/** "41.2 of 128.0 GB (32%)" for the host, then the GPU when there is one. */
+export function memoryText(m) {
+  if (!m) return "";
+  const part = (used, total) => `${used.toFixed(1)} of ${total.toFixed(1)} GB (${Math.round((used / total) * 100)}%)`;
+  const out = [`host ${part(m.hostPeakGb, m.hostTotalGb)}`];
+  if (m.gpuPeakGb !== null) out.push(`GPU ${part(m.gpuPeakGb, m.gpuTotalGb)}${m.gpus > 1 ? ` over ${m.gpus} cards` : ""}`);
+  return out.join(", ");
 }
 
 /** Checks a parsed file and keeps only the fields the page uses. Never throws. */
@@ -86,6 +118,7 @@ export function readRunFile(raw) {
     const preset = text(r.preset, 12);
     const concurrency = finite(r.concurrency);
     if (label === "" || preset === "" || concurrency === null || concurrency < 1) continue;
+    const memory = cleanMemory(r.memory);
     rows.push({
       preset,
       concurrency: Math.floor(concurrency),
@@ -100,6 +133,11 @@ export function readRunFile(raw) {
       promptSpeed: cleanSpread(r.promptSpeed),
       totalSec: cleanSpread(r.totalSec),
       promptTokens: finite(r.promptTokens),
+      // Files from before these existed have none: no failed streams known, no memory sampled.
+      failedStreams: finite(r.failedStreams),
+      memory,
+      hostMemory: flat(memory ? memory.hostPeakGb : null),
+      gpuMemory: flat(memory ? memory.gpuPeakGb : null),
     });
   }
   if (rows.length === 0) return { ok: false, error: "No usable results were found in this file." };
@@ -122,6 +160,15 @@ export function readRunFile(raw) {
       },
     };
   });
+  // The most streams each machine carried cleanly. The sentence is text from a file, so it is cut and stripped like any other.
+  const sustained = (Array.isArray(raw.sustained) ? raw.sustained : []).slice(0, MAX_ROWS).flatMap((s) => {
+    if (!s || typeof s !== "object") return [];
+    const label = text(s.label, 60);
+    const preset = text(s.preset, 12);
+    const top = finite(s.top);
+    if (label === "" || preset === "" || top === null) return [];
+    return [{ label, preset, top, sustained: finite(s.sustained), stoppedAt: finite(s.stoppedAt), sentence: text(s.sentence, 400) }];
+  });
   const settings = raw.settings && typeof raw.settings === "object" ? raw.settings : {};
   return {
     ok: true,
@@ -140,6 +187,7 @@ export function readRunFile(raw) {
       },
       machines,
       rows,
+      sustained,
     },
   };
 }
@@ -219,6 +267,7 @@ export function rowsToCsv(series) {
     "throughput_median", "throughput_min", "throughput_max",
     "prompt_speed_median", "prompt_speed_min", "prompt_speed_max",
     "total_median", "total_min", "total_max",
+    "failed_streams", "host_mem_peak_gb", "host_mem_total_gb", "gpu_mem_peak_gb", "gpu_mem_total_gb", "swap_peak_gb", "memory_samples",
     "engine", "model_file", "quant", "build", "slots", "context_per_slot", "notes", "max_tokens", "thinking", "temperature", "top_p", "top_k", "watts", "speed_per_watt_median", "tool_version", "tool_commit",
   ];
   const out = [head.join(",")];
@@ -229,6 +278,7 @@ export function rowsToCsv(series) {
       out.push([
         safeText(s.source), safeText(s.label), r.preset, r.promptTokens, r.concurrency, r.repeats, r.finished, r.speedUnit,
         ...trio(r.firstWordSec), ...trio(r.speed), ...trio(r.throughput), ...trio(r.promptSpeed), ...trio(r.totalSec),
+        r.failedStreams ?? "", r.memory?.hostPeakGb ?? "", r.memory?.hostTotalGb ?? "", r.memory?.gpuPeakGb ?? "", r.memory?.gpuTotalGb ?? "", r.memory?.swapPeakGb ?? "", r.memory?.samples ?? "",
         safeText(setup.engine), safeText(setup.modelFile), setup.quant, safeText(setup.build), setup.slots, setup.contextPerSlot, safeText(setup.notes),
         s.file.settings.maxTokens, s.file.settings.thinking,
         s.file.settings.temperature ?? "", s.file.settings.topP ?? "", s.file.settings.topK ?? "",
